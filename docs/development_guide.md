@@ -2,8 +2,8 @@
 
 ## Prerequisites
 
-- Python 3.x
-- Django 3.x or higher
+- Python 3.10+
+- Django 4.x or higher
 - pip (Python package installer)
 - Virtualenv (optional but recommended)
 
@@ -76,6 +76,7 @@ python manage.py test
   ```
 
 - **Create a new superuser**
+  
   ```bash
   python manage.py createsuperuser
   ```
