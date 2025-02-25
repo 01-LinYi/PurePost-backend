@@ -54,7 +54,7 @@ class UpdateProfileView(generics.UpdateAPIView):
     This view ensures that only authenticated users can update their profile.
     """
     serializer_class = ProfileSerializer
-    permission_classes: list = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_object(self) -> Profile:
         """

@@ -1,15 +1,18 @@
 from rest_framework import serializers
 from .models import Profile
 
+
 class ProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for the Profile model.
     Serializes all fields of the Profile model and provides validation for updating user profiles.
     """
+    username = serializers.CharField(source="user.username", read_only=True)
+
     class Meta:
         model = Profile
         fields = [
-            "user",  # Foreign key to the User model
+            "username",  # Profile has a foreign key to the User model
             "avatar",
             "bio",
             "location",
@@ -18,7 +21,8 @@ class ProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["user", "created_at", "updated_at"]  # These fields cannot be modified
+        # These fields cannot be modified
+        read_only_fields = ["username", "created_at", "updated_at"]
 
     def validate_bio(self, value: str) -> str:
         """
@@ -26,7 +30,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         Ensures the bio does not exceed the maximum allowed length.
         """
         if len(value) > 200:
-            raise serializers.ValidationError("The bio must not exceed 200 characters.")
+            raise serializers.ValidationError(
+                "The bio must not exceed 200 characters.")
         return value
 
     def validate_website(self, value: str) -> str:
@@ -35,7 +40,8 @@ class ProfileSerializer(serializers.ModelSerializer):
         Ensures the website URL is valid if provided.
         """
         if value and not value.startswith(("http://", "https://")):
-            raise serializers.ValidationError("The website URL must start with http:// or https://.")
+            raise serializers.ValidationError(
+                "The website URL must start with http:// or https://.")
         return value
 
     def validate_date_of_birth(self, value):
@@ -45,5 +51,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         """
         from datetime import date
         if value and value > date.today():
-            raise serializers.ValidationError("The date of birth cannot be in the future.")
+            raise serializers.ValidationError(
+                "The date of birth cannot be in the future.")
         return value
