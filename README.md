@@ -8,6 +8,16 @@
 
 ---
 
+## Code Repository
+
+The frontend repository is responsible for managing the UI layout and design, optimized for mobile devices.
+[PurePost Frontend Repository](https://github.com/01-LinYi/PurePost-frontend)
+
+The backend repository handles user management, content posting, social interactions, and deepfake detection:  
+[PurePost Backend Repository](https://github.com/01-LinYi/PurePost-backend)
+
+---
+
 ## Features
 
 - **User Management**: Registration, login, and profile management.

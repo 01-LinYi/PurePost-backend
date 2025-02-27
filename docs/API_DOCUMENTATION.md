@@ -81,13 +81,15 @@ This document provides an overview of the APIs available in the PurePost-backend
   ```json
   {
     "username": "John Doe",
+    "email": "user@example.com",
     "avatar": "avatars/default.png",
     "bio": "This is user1's bio.",
     "location": "Earth",
     "website": "https://example.com",
     "date_of_birth": "2000-01-01",
     "created_at": "2023-01-01T12:00:00Z",
-    "updated_at": "2023-02-01T12:00:00Z"
+    "updated_at": "2023-02-01T12:00:00Z",
+    "is_active": true
   }
   ```
 
@@ -102,7 +104,7 @@ This document provides an overview of the APIs available in the PurePost-backend
 
   ```json
   {
-    "Authorization": "Token abc123xyz",
+    "Authorization": "Token abc123xyz"
   }
   ```
 
@@ -111,13 +113,15 @@ This document provides an overview of the APIs available in the PurePost-backend
   ```json
   {
     "username": "John Doe",
+    "email": "user@example.com",
     "avatar": "avatars/default.png",
     "bio": "This is user1's bio.",
     "location": "Earth",
     "website": "https://example.com",
     "date_of_birth": "2000-01-01",
     "created_at": "2023-01-01T12:00:00Z",
-    "updated_at": "2023-02-01T12:00:00Z"
+    "updated_at": "2023-02-01T12:00:00Z",
+    "is_active": true
   }
   ```
 
@@ -132,7 +136,7 @@ This document provides an overview of the APIs available in the PurePost-backend
   ```json
   {
     "Authorization": "Token abc123xyz",
-    "Content-Type": "application/json",
+    "Content-Type": "application/json"
   }
   ```
 
@@ -141,7 +145,7 @@ This document provides an overview of the APIs available in the PurePost-backend
   ```json
   {
     "bio": "This is my updated bio.",
-    "location": "New York, USA",
+    "location": "New York, USA"
   }
   ```
 
@@ -150,12 +154,14 @@ This document provides an overview of the APIs available in the PurePost-backend
   ```json
   {
     "username": "John Doe",
+    "email": "user@example.com",
     "avatar": "avatars/default.png",
     "bio": "This is my updated bio.",
     "location": "New York, USA",
     "website": "https://example.com",
     "date_of_birth": "2000-01-01",
     "created_at": "2023-01-01T12:00:00Z",
-    "updated_at": "2023-02-01T12:00:00Z"
+    "updated_at": "2023-02-01T12:00:00Z",
+    "is_active": true
   }
   ```

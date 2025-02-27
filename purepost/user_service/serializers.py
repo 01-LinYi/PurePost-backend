@@ -8,11 +8,15 @@ class ProfileSerializer(serializers.ModelSerializer):
     Serializes all fields of the Profile model and provides validation for updating user profiles.
     """
     username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+    is_active = serializers.BooleanField(
+        source="user.is_active", read_only=True)
 
     class Meta:
         model = Profile
         fields = [
             "username",  # Profile has a foreign key to the User model
+            "email",  # Profile has a foreign key to the User model
             "avatar",
             "bio",
             "location",
@@ -20,9 +24,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "created_at",
             "updated_at",
+            "is_active",  # Profile has a foreign key to the User model
         ]
         # These fields cannot be modified
-        read_only_fields = ["username", "created_at", "updated_at"]
+        read_only_fields = ["username", "email",
+                            "is_active", "created_at", "updated_at"]
 
     def validate_bio(self, value: str) -> str:
         """
