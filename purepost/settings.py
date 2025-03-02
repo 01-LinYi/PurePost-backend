@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken", 
     "corsheaders",
 
+    "purepost.content_moderation",
 ]
 
 
@@ -78,6 +79,7 @@ DATABASES = {
     }
 }
 '''
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
