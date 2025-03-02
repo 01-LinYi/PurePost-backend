@@ -16,6 +16,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # Installed apps
 INSTALLED_APPS = [
+    # Django apps
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -30,8 +32,9 @@ INSTALLED_APPS = [
     "corsheaders",
 
     # Custom apps
-    "purepost.auth_service",  # Auth Service app
-    "purepost.user_service",  # User Service app
+    "purepost.auth_service",    # Auth Service app
+    "purepost.user_service",    # User Service app
+    "purepost.message_service", # Message Service app
 ]
 
 # Middleware
@@ -137,3 +140,13 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+ASGI_APPLICATION = "purepost.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
