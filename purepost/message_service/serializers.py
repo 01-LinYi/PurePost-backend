@@ -29,11 +29,11 @@ class ConversationSerializer(serializers.ModelSerializer):
             return existing_conversation
 
         # Generate default name
-        usernames = sorted(participant.username for participant in participants)
+        usernames = sorted(participant.user.username for participant in participants)
         validated_data["name"] = ", ".join(usernames)
 
         conversation: Conversation = Conversation.objects.create(**validated_data)
-        conversation.participants.set(participants)  # Set the ManyToMany relationship
+        conversation.participants.set(participants)  # noqa Set the ManyToMany relationship
         return conversation
 
     def update(self, instance, validated_data):

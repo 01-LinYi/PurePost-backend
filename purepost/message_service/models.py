@@ -1,9 +1,12 @@
+import uuid
+
 from django.db import models
 
 from purepost.user_service.models import Profile
 
 
 class Conversation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4(), editable=False)  # Use UUID for ID
     participants = models.ManyToManyField(
         Profile,
         related_name="conversations"
