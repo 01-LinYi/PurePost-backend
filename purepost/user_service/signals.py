@@ -5,7 +5,7 @@ from .models import Profile  # Import the Profile model
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def create_user_profile(_, instance, created):
+def create_user_profile(sender, instance, created, **kwargs):
     """
     Auto-create a Profile whenever a new User is created.
     """
@@ -14,7 +14,7 @@ def create_user_profile(_, instance, created):
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def save_user_profile(_, instance):
+def save_user_profile(sender, instance, **kwargs):
     """
     Save the Profile when the associated User is saved.
     """
