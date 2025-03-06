@@ -14,7 +14,7 @@ class Conversation(models.Model):
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     last_message_at = models.DateTimeField(null=True, blank=True)
-    image = models.BooleanField(default=False)
+    image = models.ImageField(default=False)
 
     def __str__(self):
         return f"Conversation {self.name}"

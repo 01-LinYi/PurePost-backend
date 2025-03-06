@@ -5,3 +5,4 @@ django-cors-headers
 channels[daphne]
 channels_redis
 Pillow
+asgiref

@@ -1,9 +1,9 @@
 import os
 
-from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
+
+from purepost.message_service.auth_middleware import TokenAuthMiddleware
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "purepost.settings")
 # Initialize Django ASGI application early to ensure the AppRegistry
@@ -15,8 +15,6 @@ from purepost.message_service.routing import websocket_urlpatterns
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(URLRouter(websocket_urlpatterns))
-        ),
+        "websocket": TokenAuthMiddleware(URLRouter(websocket_urlpatterns)),
     }
 )
