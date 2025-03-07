@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     "purepost.auth_service",    # Auth Service app
     "purepost.user_service",    # User Service app
     "purepost.message_service", # Message Service app
+    "purepost.content_moderation",  # Post Service app
+
 ]
 
 # Middleware

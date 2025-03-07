@@ -6,4 +6,5 @@ urlpatterns = [
     path('messages/', include('purepost.message_service.urls')),
     path('auth/', include("purepost.auth_service.urls")),
     path('users/', include('purepost.user_service.urls')),
+    path('content/', include('purepost.content_moderation.urls')),
 ]
