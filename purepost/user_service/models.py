@@ -8,6 +8,7 @@ class Profile(models.Model):
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
+        primary_key=True,
         on_delete=models.CASCADE,
         related_name='user_profile',  # Allows reverse lookup via `user.user_profile`
         help_text="The user this profile belongs to.",

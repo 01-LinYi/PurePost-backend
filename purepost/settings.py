@@ -16,6 +16,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # Installed apps
 INSTALLED_APPS = [
+    # Django apps
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -30,9 +32,11 @@ INSTALLED_APPS = [
     "corsheaders",
 
     # Custom apps
-    "purepost.auth_service",  # Auth Service app
-    "purepost.user_service",  # User Service app
+    "purepost.auth_service",    # Auth Service app
+    "purepost.user_service",    # User Service app
+    "purepost.message_service", # Message Service app
     "purepost.content_moderation",  # Post Service app
+
 ]
 
 # Middleware
@@ -138,3 +142,34 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+ASGI_APPLICATION = "purepost.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("localhost", 6379)], # TODO: user variable instead of hardcode
+        },
+    },
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
+}
