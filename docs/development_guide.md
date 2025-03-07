@@ -44,7 +44,13 @@
 6. **Run the Development Server**
 
    ```bash
+   docker run --rm -p 6379:6379 redis:7 # start a Redis server
    python manage.py runserver
+   
+   # OR
+   
+   # Important: change CHANNEL_LAYERS config from localhost to redis
+   docker compose up -d
    ```
 
 ## Running Tests
