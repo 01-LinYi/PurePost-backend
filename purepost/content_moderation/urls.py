@@ -1,8 +1,12 @@
-from django.urls import path
+from rest_framework.routers import DefaultRouter
+from django.urls import path, include
 from .views import PostViewSet, FolderViewSet, SavedPostViewSet
 
+router = DefaultRouter()
+router.register(r'posts', PostViewSet)
+router.register(r'folders', FolderViewSet, basename='folder')
+router.register(r'saved-posts', SavedPostViewSet, basename='saved-post')
+
 urlpatterns = [
-    path('posts/', PostViewSet.as_view(), name='post'),
-    path('folders/', FolderViewSet.as_view(), name='folder'),
-    path('saved-posts/', SavedPostViewSet.as_view(), name='savedpost'),
+    path('', include(router.urls)),
 ]
