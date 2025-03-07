@@ -45,6 +45,9 @@ class PostViewSet(viewsets.ModelViewSet):
         # Filter by user ID
         user_id = self.request.query_params.get('user_id')
         if user_id:
+            if user_id == 'me':
+                user_id = self.request.user.id
+            # Get posts of the specified user
             queryset = queryset.filter(user_id=user_id)
 
         return queryset
@@ -60,7 +63,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         # Check if already liked (assuming Like model exists, adjust as needed)
         # Comment this section if Like model is not yet implemented
-        """
+        
         if post.likes.filter(user=request.user).exists():
             return Response(
                 {"detail": "You have already liked this post"},
@@ -69,7 +72,7 @@ class PostViewSet(viewsets.ModelViewSet):
         
         # Create like record
         post.likes.create(user=request.user)
-        """
+        
 
         # Update like count
         post.like_count += 1
