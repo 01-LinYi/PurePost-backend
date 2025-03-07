@@ -1,4 +1,3 @@
-from django.db.models import Count
 from rest_framework import serializers
 from .models import *
 
@@ -6,34 +5,61 @@ from .models import *
 class ConversationSerializer(serializers.ModelSerializer):
     name = serializers.CharField(required=False, allow_blank=True)  # Make name optional in requests
     participants = serializers.PrimaryKeyRelatedField(many=True, queryset=Profile.objects.all())
+    is_existing = False
 
     class Meta:
         model = Conversation
         fields = ['id', 'name', 'created_at', 'participants']
         read_only_fields = ['id', 'created_at']
 
+    @staticmethod
+    def validate_participants(value):
+        """
+        Validate that participant IDs are unique.
+        """
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Duplicate participant IDs are not allowed.")
+        return value
+
     def create(self, validated_data):
-        participants = validated_data.pop('participants', [])  # Extract participants
+        # Extract the participants from the validated data
+        participants = validated_data.pop('participants')  # Remove participants from validated_data
 
-        # Check if there is a conversation with the exact same participants
-        existing_conversation = (
-            Conversation.objects.annotate(participant_count=Count('participants'))  # Annotate participant count
-            .filter(participants__in=participants)  # Ensure participants match
-            .filter(participant_count=len(participants))  # Ensure count matches
-            .distinct()
-            .first()
-        )
+        # print(f"Participants: {participants}")
 
-        # Return old conversation if existed
-        if existing_conversation:
-            return existing_conversation
+        # # Check if a conversation with the exact same participants exists
+        # existing_conversation = (
+        #     Conversation.objects.annotate(participant_count=Count("participants"))
+        #     .filter(participant_count=len(participants))  # Match participant count
+        #     .filter(participants__in=participants)
+        #     .distinct()
+        # )
+        #
+        # print(f"Existing conversations: {existing_conversation}")
+        #
+        # # Verify if an exact match exists
+        # for conv in existing_conversation:
+        #     if set(conv.participants.values_list("user_id", flat=True)) == set([p.user.id for p in participants]):
+        #         print("Conversation already exists")
+        #         self.is_existing = True
+        #         return conv
+        #
+        # print("Conversation does not exist")
 
-        # Generate default name
-        usernames = sorted(participant.user.username for participant in participants)
-        validated_data["name"] = ", ".join(usernames)
+        # Generate default name if not provided
+        if 'name' not in validated_data or not validated_data['name']:
+            usernames = sorted(participant.user.username for participant in participants)
+            validated_data["name"] = ", ".join(usernames)
 
-        conversation: Conversation = Conversation.objects.create(**validated_data)
-        conversation.participants.set(participants)  # noqa Set the ManyToMany relationship
+        # Create the conversation
+        conversation = Conversation.objects.create(**validated_data)
+
+        # Set the ManyToMany relationship for participants
+        conversation.participants.set(participants)
+
+        # Ensure the `is_existing` flag is set for a new conversation
+        self.is_existing = False
+
         return conversation
 
     def update(self, instance, validated_data):

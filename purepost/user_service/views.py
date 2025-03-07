@@ -1,9 +1,12 @@
 from typing import Any
+
+from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework.permissions import IsAuthenticated
+
 from .models import Profile
 from .serializers import ProfileSerializer
 
@@ -70,3 +73,27 @@ class UpdateProfileView(generics.UpdateAPIView):
         validation or side effects can be added here if needed.
         """
         serializer.save()
+
+
+class SearchProfileView(generics.ListAPIView):
+    """
+    Search for profiles using the input username.
+
+    This view allows searching for profiles whose usernames partially or fully match
+    the provided input. It uses a case-insensitive search.
+    """
+    serializer_class = ProfileSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Profile.objects.all()
+    user_model = get_user_model()
+
+    def get_queryset(self):
+        """
+        Override to filter profiles based on username query.
+
+        The search is case-insensitive and checks for users with usernames that
+        partially or fully match the provided 'username' query parameter, and then
+        retrieves their associated profiles.
+        """
+        username_query = self.request.query_params.get('username', '')  # noqa
+        return self.queryset.filter(user__in=self.user_model.objects.filter(username__icontains=username_query))

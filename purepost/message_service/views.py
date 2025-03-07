@@ -1,8 +1,11 @@
-from rest_framework.generics import GenericAPIView, ListCreateAPIView, UpdateAPIView
+from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import GenericAPIView, ListCreateAPIView, UpdateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from purepost.message_service.models import Conversation
-from purepost.message_service.serializers import ConversationSerializer
+from purepost.message_service.models import Conversation, Message
+from purepost.message_service.serializers import ConversationSerializer, MessageSerializer
 from purepost.user_service.models import Profile
 
 
@@ -31,7 +34,7 @@ class ConversationView(GenericAPIView):
         return Conversation.objects.filter(participants=profile).order_by('last_message_at')
 
 
-class ConversationListCreateView(ListCreateAPIView, ConversationView):
+class ConversationOverviewView(ListCreateAPIView, ConversationView):
     """
     Class representing a view for listing and creating conversations.
 
@@ -43,7 +46,7 @@ class ConversationListCreateView(ListCreateAPIView, ConversationView):
     pass
 
 
-class ConversationUpdateView(UpdateAPIView, ConversationView):
+class ConversationDetailView(UpdateAPIView, ConversationView):
     """
     Provides functionality to update a conversation.
 

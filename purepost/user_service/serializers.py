@@ -15,6 +15,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = [
+            "user_id",
             "username",  # Profile has a foreign key to the User model
             "email",  # Profile has a foreign key to the User model
             "avatar",
