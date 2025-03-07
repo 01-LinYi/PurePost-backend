@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Folder, SavedPost
+from .models import Post, Folder, SavedPost, Share, Comment
 from django.contrib.auth import get_user_model
 
 
@@ -41,6 +41,12 @@ class PostSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return SavedPost.objects.filter(user=request.user, post=obj).exists()
         return False
+    
+    def get_shares(self, obj):
+        return ShareSerializer(obj.shares.all(), many=True).data
+    
+    def get_comments(self, obj):
+        return CommentSerializer(obj.comments.filter(parent=None), many=True).data
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -147,3 +153,35 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
+
+
+class ShareSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    post = PostSerializer(read_only=True)
+
+    class Meta:
+        model = Share
+        fields = ['id', 'user', 'post', 'comment', 'shared_at']
+        read_only_fields = ['user', 'post', 'shared_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['user'] = request.user
+        return super().create(validated_data)
+
+class CommentSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    replies = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'user', 'post', 'content', 'parent', 'created_at', 'replies']
+        read_only_fields = ['user', 'post', 'created_at', 'replies']
+
+    def get_replies(self, obj):
+        return CommentSerializer(obj.replies.all(), many=True).data
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['user'] = request.user
+        return super().create(validated_data)
