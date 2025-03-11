@@ -43,14 +43,28 @@
 
 6. **Run the Development Server**
 
+   Ensure you are in the root directory
+
    ```bash
-   docker run --rm -p 6379:6379 redis:7 # start a Redis server
-   python manage.py runserver
-   
+   ./scripts/debug.sh start
+
    # OR
-   
+
+   docker run --rm -p 6379:6379 redis:7 # start a Redis server
+   docker run --rm -p 9000:9000 -p 9001:9001 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin minio/minio server /data --console-address ":9001" # start a MinIO server
+
+   python manage.py runserver
+
+   # OR
+
    # Important: change CHANNEL_LAYERS config from localhost to redis
    docker compose up -d
+   ```
+
+7. **Turn off dev server**
+
+   ```bash
+      ./scripts/debug.sh stop
    ```
 
 ## Running Tests
@@ -82,7 +96,7 @@ python manage.py test
   ```
 
 - **Create a new superuser**
-  
+
   ```bash
   python manage.py createsuperuser
   ```
@@ -104,6 +118,7 @@ For deployment, follow these steps:
    ```
 
 3. **Run the Server**
+
    ```bash
    python manage.py runserver 0.0.0.0:8000
    ```
