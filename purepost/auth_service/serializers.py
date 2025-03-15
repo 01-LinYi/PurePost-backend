@@ -31,3 +31,9 @@ class DeleteAccountSerializer(serializers.Serializer):
         if not user.check_password(data['password']):
             raise serializers.ValidationError("Incorrect password")
         return data
+    
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
