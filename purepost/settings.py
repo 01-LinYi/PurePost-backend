@@ -35,7 +35,7 @@ INSTALLED_APPS = [
     # Custom apps
     "purepost.auth_service",    # Auth Service app
     "purepost.user_service",    # User Service app
-    "purepost.message_service", # Message Service app
+    "purepost.message_service",  # Message Service app
     "purepost.content_moderation",  # Post Service app
 ]
 
@@ -135,32 +135,37 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-# Static files and media configuration
+# Static files
 STATIC_URL = "/static/"
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
 
 # MinIO / S3 Storage Configuration
-USE_S3 = os.getenv('USE_S3', 'False') == 'True'
+USE_S3 = os.getenv('USE_S3', 'True') == 'True'
 
 if USE_S3:
     # AWS/MinIO S3 capabilities
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin')
-    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', 'purepost-media')
-    AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL', 'http://minio:9000')
+    AWS_STORAGE_BUCKET_NAME = os.getenv(
+        'AWS_STORAGE_BUCKET_NAME', 'purepost-media')
+    AWS_S3_ENDPOINT_URL = os.getenv(
+        'AWS_S3_ENDPOINT_URL', 'http://localhost:9000')
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
     }
     AWS_DEFAULT_ACL = 'public-read'
     AWS_QUERYSTRING_AUTH = False
     AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'False') == 'True'
-    
-    # When using MinIO, set the default file storage to S3
+    # default file storage
     DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-    
-    # Static and media URL configuration
-    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+
+    # configure media root and URL
+    MEDIA_ROOT = ''  # leave empty
+    MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
+else:
+    # use local file storage
+    MEDIA_ROOT = BASE_DIR / "media"
+    MEDIA_URL = "/media/"
+
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
