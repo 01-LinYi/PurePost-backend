@@ -58,13 +58,19 @@
    # OR
 
    # Important: change CHANNEL_LAYERS config from localhost to redis
-   docker compose up -d
+   # Already fix it in compose.yml
+   docker compose up -d --build
    ```
 
 7. **Turn off dev server**
+   Ctrl + C,
+   To stop all containers:
 
    ```bash
       ./scripts/debug.sh stop
+
+      OR
+      docker compose down -v
    ```
 
 ## Running Tests

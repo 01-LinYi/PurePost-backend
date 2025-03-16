@@ -16,6 +16,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # Installed apps
 INSTALLED_APPS = [
+    "storages",
+
     # Django apps
     "daphne",
     "django.contrib.admin",
@@ -30,18 +32,17 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "rest_framework.authtoken",
     "corsheaders",
-    "storages",
 
     # Custom apps
-    "purepost.auth_service",    # Auth Service app
-    "purepost.user_service",    # User Service app
-    "purepost.message_service",  # Message Service app
-    "purepost.content_moderation",  # Post Service app
+    "purepost.auth_service",  # Authentication service
+    "purepost.user_service",  # User service
+    "purepost.message_service",  # Message service
+    "purepost.content_moderation",  # Content moderation (Post) service
 ]
 
 # Middleware
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # CORS headers
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -78,7 +79,7 @@ TEMPLATES = [
 # WSGI application
 WSGI_APPLICATION = "purepost.wsgi.application"
 
-# Database configuration (using SQLite for local development)
+# Database configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -86,22 +87,7 @@ DATABASES = {
     }
 }
 
-# Uncomment the following to use PostgreSQL in production:
-'''
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "purepost"),
-        "USER": os.getenv("POSTGRES_USER", "postgres"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "password"),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-    }
-}
-'''
-
 # Authentication and user model
-# Use the custom user model from auth_service
 AUTH_USER_MODEL = "auth_service.User"
 
 # Password validation
@@ -135,37 +121,98 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-# Static files
-STATIC_URL = "/static/"
 
-# MinIO / S3 Storage Configuration
+# Storage settings. compatible with S3, Django 5
 USE_S3 = os.getenv('USE_S3', 'True') == 'True'
 
 if USE_S3:
-    # AWS/MinIO S3 capabilities
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin')
-    AWS_STORAGE_BUCKET_NAME = os.getenv(
-        'AWS_STORAGE_BUCKET_NAME', 'purepost-media')
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "bucket_name": os.getenv('AWS_STORAGE_BUCKET_NAME', 'purepost-media'),
+
+
+                "access_key": os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin'),
+                "secret_key": os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
+
+
+                "endpoint_url": os.getenv('AWS_S3_ENDPOINT_URL', 'http://localhost:9000'),
+                "region_name": os.getenv('AWS_S3_REGION_NAME', 'us-east-1'),
+
+
+                "addressing_style": "path",
+                "signature_version": "s3v4",
+
+
+                "verify": os.getenv('AWS_S3_VERIFY', 'False') == 'True',
+                "default_acl": "public-read",
+
+
+                "querystring_auth": False,
+
+
+                "file_overwrite": True,
+                "max_memory_size": 10 * 1024 * 1024,  # 10MB
+
+
+                "object_parameters": {
+                    "CacheControl": "max-age=86400",
+                },
+                "custom_domain": None,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+            "OPTIONS": {
+
+                "bucket_name": os.getenv('AWS_STORAGE_BUCKET_NAME', 'purepost-media'),
+                "location": "static",
+
+
+                "access_key": os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin'),
+                "secret_key": os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
+
+
+                "endpoint_url": os.getenv('AWS_S3_ENDPOINT_URL', 'http://localhost:9000'),
+                "region_name": os.getenv('AWS_S3_REGION_NAME', 'us-east-1'),
+
+                "addressing_style": "path",
+                "signature_version": "s3v4",
+
+
+                "verify": os.getenv('AWS_S3_VERIFY', 'False') == 'True',
+                "default_acl": "public-read",
+
+
+                "querystring_auth": False,
+
+
+                "file_overwrite": True,
+            },
+        },
+    }
+
     AWS_S3_ENDPOINT_URL = os.getenv(
         'AWS_S3_ENDPOINT_URL', 'http://localhost:9000')
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_DEFAULT_ACL = 'public-read'
-    AWS_QUERYSTRING_AUTH = False
-    AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY', 'False') == 'True'
-    # default file storage
-    DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-    # configure media root and URL
-    MEDIA_ROOT = ''  # leave empty
-    MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/'
+    AWS_STORAGE_BUCKET_NAME = os.getenv(
+        'AWS_STORAGE_BUCKET_NAME', 'purepost-media')
+    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+    STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
 else:
-    # use local file storage
-    MEDIA_ROOT = BASE_DIR / "media"
+    # Use local file storage
+    MEDIA_ROOT = BASE_DIR / "uploads"
     MEDIA_URL = "/media/"
+    STATIC_URL = "/static/"
 
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -176,32 +223,6 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [(os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", 6379)))],
-        },
-    },
-}
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "WARNING",
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
-            "propagate": False,
-        },
-        "purepost": {  # 添加应用日志
-            "handlers": ["console"],
-            "level": os.getenv("LOG_LEVEL", "INFO"),
-            "propagate": False,
         },
     },
 }

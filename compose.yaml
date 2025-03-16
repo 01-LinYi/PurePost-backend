@@ -14,28 +14,37 @@ services:
     ports:
       - 8000:8000
     depends_on:
-      - minio
-      - redis
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     environment:
-      # Add your environment variables here
+      # Django configuration
       - DEBUG=True
       - SECRET_KEY=mysecretkey
       - ALLOWED_HOSTS=localhost,127.0.0.1
+      
       # MinIO configuration
-      - USE_S3=False
+      - USE_S3=True
       - AWS_ACCESS_KEY_ID=minioadmin
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_STORAGE_BUCKET_NAME=purepost-media
       - AWS_S3_ENDPOINT_URL=http://minio:9000
       - AWS_S3_VERIFY=False
+      
+      # Redis configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   redis:
-    image: redis
+    image: redis:7
     restart: always
     expose:
       - 6379
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -52,12 +61,32 @@ services:
       - MINIO_ROOT_USER=minioadmin
       - MINIO_ROOT_PASSWORD=minioadmin
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
     volumes:
       - minio-data:/data
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+
+      /usr/bin/mc mb myminio/purepost-media || true;
+
+      /usr/bin/mc anonymous set download myminio/purepost-media;
+
+      echo 'MinIO initialization completed successfully!';
+      echo 'Created bucket: purepost-media';
+      "
 
 volumes:
   redis-data:
