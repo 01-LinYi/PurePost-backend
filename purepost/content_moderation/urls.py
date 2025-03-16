@@ -13,4 +13,5 @@ urlpatterns = [
     path('posts/<int:pk>/unlike/', PostViewSet.as_view({'post': 'unlike'}), name='post-unlike'),
     path('posts/<int:pk>/share/', PostViewSet.as_view({'post': 'share'}), name='post-share'),
     path('posts/<int:pk>/comment/', PostViewSet.as_view({'post': 'comment'}), name='post-comment'),
+    path('posts/<int:pk>/delete-comment/', PostViewSet.as_view({'delete': 'delete_comment'}), name='post-delete-comment'),
 ]

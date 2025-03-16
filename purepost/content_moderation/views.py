@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, permissions, filters
+from rest_framework import viewsets, status, permissions, filters, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
@@ -11,6 +11,49 @@ from .serializers import (
     CommentSerializer, ShareSerializer
 )
 from .permissions import IsOwnerOrReadOnly
+
+
+from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth import get_user_model
+from .serializers import UserSerializer, PostSerializer
+
+User = get_user_model()
+
+
+class ProfilePostPagination(PageNumberPagination):
+
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+class UserProfileView(generics.ListAPIView):
+    """
+    API endpoint to view a user's profile and posts with permission control.
+    """
+    serializer_class = PostSerializer
+    pagination_class = ProfilePostPagination
+
+    def get(self, request, username, *args, **kwargs):
+        user = get_object_or_404(User, username=username)
+        profile_serializer = UserSerializer(user, context={'request': request})
+
+        # Check privacy settings
+        if user.is_private and user != request.user:
+            return Response({'detail': 'This profile is private.'}, status=403)
+
+        # Retrieve visible posts
+        posts = Post.objects.filter(user=user).order_by('-created_at')
+        if user != request.user:
+            posts = posts.filter(visibility='public')  # Only show public posts for others
+
+        page = self.paginate_queryset(posts)
+        post_serializer = PostSerializer(page, many=True, context={'request': request})
+
+        return self.get_paginated_response({
+            'profile': profile_serializer.data,
+            'posts': post_serializer.data
+        })
 
 
 class PostViewSet(viewsets.ModelViewSet):

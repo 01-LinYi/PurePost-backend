@@ -251,7 +251,7 @@ class PostAPITestCase(APITestCase):
 
         # Verify the content of the comment
         self.assertEqual(self.public_post.comments.last().content, 'This is a test comment.')
-        
+
 
     def test_delete_comment(self):
         """Test deleting a comment"""
@@ -553,3 +553,85 @@ class SavedPostAPITestCase(APITestCase):
         self.assertEqual(SavedPost.objects.filter(
             user=self.user1, post=self.post2, folder=self.folder1
         ).count(), 1)
+
+
+
+class ProfileAndPostPermissionTestCase(APITestCase):
+    """Test cases for viewing user profiles and posts with permission"""
+
+    def setUp(self):
+        """Set up test data"""
+        self.user1 = User.objects.create_user(
+            username='user1', email='user1@email.com', password='password123')
+        self.user2 = User.objects.create_user(
+            username='user2', email='user2@email.com', password='password123')
+
+        self.client = APIClient()
+
+        # Create test posts for user1
+        self.public_post = Post.objects.create(
+            user=self.user1,
+            content='This is a public post.',
+            visibility='public'
+        )
+
+        self.private_post = Post.objects.create(
+            user=self.user1,
+            content='This is a private post.',
+            visibility='private'
+        )
+
+    def test_view_public_profile_unauthenticated(self):
+        """Test that unauthenticated users can view public user profiles"""
+        response = self.client.get(reverse('user-profile', kwargs={'username': self.user1.username}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Ensure only public profile details are visible
+        data = json.loads(response.content)
+        self.assertIn('username', data)
+        self.assertNotIn('email', data)  # Email should not be exposed
+
+    def test_view_profile_authenticated(self):
+        """Test that authenticated users can view other users' profiles"""
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('user-profile', kwargs={'username': self.user1.username}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = json.loads(response.content)
+        self.assertIn('username', data)
+        self.assertNotIn('email', data)  # Sensitive information should be hidden
+
+    def test_view_public_posts_authenticated(self):
+        """Test that authenticated users can see public posts of others"""
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('user-posts', kwargs={'username': self.user1.username}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)  # Only public posts should be visible
+        self.assertEqual(data[0]['content'], 'This is a public post.')
+
+    def test_view_private_posts_authenticated(self):
+        """Test that authenticated users cannot see private posts of others"""
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('user-posts', kwargs={'username': self.user1.username}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 1)  # Only public posts should be visible
+        self.assertNotIn('This is a private post.', [post['content'] for post in data])
+
+    def test_view_own_private_posts(self):
+        """Test that users can view their own private posts"""
+        self.client.force_authenticate(user=self.user1)
+        response = self.client.get(reverse('user-posts', kwargs={'username': self.user1.username}))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = json.loads(response.content)
+        self.assertEqual(len(data), 2)  # Both public and private posts should be visible
+
+    def test_view_non_existent_user_profile(self):
+        """Test that accessing a non-existent user profile returns 404"""
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.get(reverse('user-profile', kwargs={'username': 'nonexistentuser'}))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

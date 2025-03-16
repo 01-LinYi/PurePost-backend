@@ -7,6 +7,8 @@ class User(AbstractUser):
 
     followings = models.ManyToManyField('self', symmetrical=False, related_name="followers", blank=True)
 
+    is_private = models.BooleanField(default=False)
+
     def __str__(self):
         return self.username
     
