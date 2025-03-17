@@ -1,0 +1,29 @@
+# API Framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Image Processing
+Pillow
+numpy
+
+# Model Inference
+onnxruntime
+onnx
+
+# Utilities
+pydantic
+python-dotenv
+
+# Logging & Monitoring
+loguru
+
+# Performance
+cachetools
+
+# Testing
+httpx
+pytest
+
+# Production
+gunicorn
