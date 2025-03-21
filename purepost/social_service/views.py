@@ -1,6 +1,7 @@
 from rest_framework.generics import DestroyAPIView, CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 
+from purepost.social_service.FollowPagination import FollowPagination
 from purepost.social_service.models import Follow
 from purepost.social_service.serializers import FollowSerializer
 
@@ -9,6 +10,7 @@ class CurrentFollowerService(ListAPIView, CreateAPIView, DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'following__id'
     serializer_class = FollowSerializer
+    pagination_class = FollowPagination
 
     def get_queryset(self):
         curr_user = self.request.user
@@ -19,6 +21,7 @@ class CurrentFollowingService(ListAPIView, CreateAPIView, DestroyAPIView):
     permission_classes = [IsAuthenticated]
     lookup_field = 'follower__id'
     serializer_class = FollowSerializer
+    pagination_class = FollowPagination
 
     def get_queryset(self):
         curr_user = self.request.user
@@ -27,6 +30,7 @@ class CurrentFollowingService(ListAPIView, CreateAPIView, DestroyAPIView):
 
 class OtherFollowerService(ListAPIView):
     serializer_class = FollowSerializer
+    pagination_class = FollowPagination
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
@@ -37,6 +41,7 @@ class OtherFollowerService(ListAPIView):
 
 class OtherFollowingService(ListAPIView):
     serializer_class = FollowSerializer
+    pagination_class = FollowPagination
 
     def get_queryset(self):
         user_id = self.kwargs['user_id']
