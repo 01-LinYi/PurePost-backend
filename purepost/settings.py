@@ -68,7 +68,7 @@ ROOT_URLCONF = "purepost.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -105,6 +105,10 @@ DATABASES = {
     }
 }
 '''
+
+# Redis
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", 6379)
 
 # Authentication and user model
 # Use the custom user model from auth_service
@@ -165,7 +169,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv("REDIS_HOST", "localhost"), os.getenv("REDIS_PORT", 6379))],
+            "hosts": [(REDIS_HOST, REDIS_PORT)],
         },
     },
 }

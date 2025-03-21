@@ -7,3 +7,4 @@ channels_redis
 Pillow
 asgiref
 python-dotenv
+redis
