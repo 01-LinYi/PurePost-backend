@@ -1,12 +1,18 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# load environment vars from .env
+if os.getenv("IS_PROD", "False") == "True":
+    load_dotenv(".env.prod")
+else:
+    load_dotenv(".env.dev")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key for Django project
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
 
 # Debug mode
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -122,6 +128,15 @@ REST_FRAMEWORK = {
     ),
 }
 
+# Email
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT", 587)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False") == "True"
+
 # JWT settings
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
@@ -150,7 +165,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("localhost", 6379)],  # TODO: user variable instead of hardcode
+            "hosts": [(os.getenv("REDIS_HOST", "localhost"), os.getenv("REDIS_PORT", 6379))],
         },
     },
 }
@@ -170,7 +185,7 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "level": os.getenv("LOG_LEVEL", "INFO"),
             "propagate": False,
         },
     },

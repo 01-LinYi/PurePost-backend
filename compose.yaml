@@ -11,8 +11,11 @@ services:
   server:
     build:
       context: .
+    environment:
+      - IS_PROD=True
+    env_file: .env.prod
     ports:
-      - 8000:8000
+      - "8000:8000"
   
   redis:
     image: redis
