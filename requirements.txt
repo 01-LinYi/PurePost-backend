@@ -7,4 +7,5 @@ channels_redis
 Pillow
 asgiref
 python-dotenv
+celery
 redis

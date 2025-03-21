@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from .serializers import RegisterSerializer, LoginSerializer, DeleteAccountSerializer
 from .. import settings
-from ..notification_service.email_service import send_email
+from ..notification_service.email_service import send_email_async
 
 User = get_user_model()
 
@@ -98,7 +98,7 @@ class EmailVerificationView(APIView):
         redis_client.setex(redis_key, redis_ttl, verification_code)
 
         # Send the verification code via email
-        send_email(
+        send_email_async(
             subject="Your Verification Code",
             to_email=[user.email],
             template_name="emails/verify_email.html",
