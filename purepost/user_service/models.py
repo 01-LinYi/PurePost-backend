@@ -18,7 +18,7 @@ class Profile(models.Model):
         upload_to='avatars/',
         blank=True,
         null=True,
-        default='avatars/default.png',  # Path to the default image
+        default='avatars/defaults.png',  # Path to the default image
         help_text="User's profile picture."
     )
     bio = models.TextField(

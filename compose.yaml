@@ -11,8 +11,9 @@ services:
   server:
     build:
       context: .
+    env_file: .env.prod
     ports:
-      - 8000:8000
+      - "8000:8000"
     depends_on:
       minio:
         condition: service_healthy
@@ -21,8 +22,8 @@ services:
       minio-init:
         condition: service_completed_successfully
     environment:
-      # Django configuration
-      - DEBUG=True
+      - IS_PROD=True
+      - DEBUG=False
       - SECRET_KEY=mysecretkey
       - ALLOWED_HOSTS=localhost,127.0.0.1
       

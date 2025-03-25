@@ -8,3 +8,4 @@ Pillow
 asgiref
 boto3
 django-storages
+python-dotenv
