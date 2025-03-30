@@ -3,13 +3,11 @@ import onnxruntime
 import os
 from PIL import Image
 import logging
-import cv2
-
 # Configure logging
 logger = logging.getLogger("dfdetect.inference")
 
 # Global variables
-MODEL_NAME = "resnet_quantized" #, "resnet_unoptimized", "resnet_optimized"
+MODEL_NAME = "ResNet18" # "ResNet18_unoptimized"
 MODEL_PATH = os.path.join("model", f"{MODEL_NAME}.onnx")
 INPUT_SIZE = (224, 224)  # Model input dimensions
 LABELS = ["real", "deepfake"]  # Class labels
@@ -183,7 +181,6 @@ def predict(image):
         # Run inference
         outputs = SESSION.run([output_name], {input_name: input_data})
         scores = outputs[0][0]  # Extract scores
-        
         # Process output based on model type
         if len(scores) == len(LABELS):
             # Apply softmax to convert logits to probabilities
