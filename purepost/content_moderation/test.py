@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from .models import Post, Folder, SavedPost, Comment
+from .models import Post, Folder, SavedPost, Comment, Like, Share
 import tempfile
 from PIL import Image
 import json
@@ -23,7 +23,8 @@ class ModelTestCase(TestCase):
         self.post = Post.objects.create(
             user=self.user,
             content='Test post content',
-            visibility='public'
+            visibility='public',
+            disclaimer='Fictional interpretation'
         )
         self.folder = Folder.objects.create(
             user=self.user,
@@ -635,3 +636,108 @@ class ProfileAndPostPermissionTestCase(APITestCase):
         self.client.force_authenticate(user=self.user2)
         response = self.client.get(reverse('user-profile', kwargs={'username': 'nonexistentuser'}))
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class PostDisclaimerTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='user1', password='password1')
+        self.client.login(username='user1', password='password1')
+        self.post = Post.objects.create(user=self.user, content="Test Post", disclaimer="Fictional interpretation")
+        self.post_data = {'content': 'New post with disclaimer', 'disclaimer': 'Fictional interpretation'}
+    
+    def test_create_post_with_disclaimer(self):
+        response = self.client.post('/content/posts/', self.post_data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['disclaimer'], 'Fictional interpretation')
+    
+    def test_update_post_with_disclaimer(self):
+        update_data = {'disclaimer': 'Notes contain AI-generated content'}
+        response = self.client.patch(f'/content/posts/{self.post.id}/', update_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.disclaimer, 'Notes contain AI-generated content')
+    
+    def test_view_post_with_disclaimer(self):
+        response = self.client.get(f'/content/posts/{self.post.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['disclaimer'], 'Fictional interpretation')
+    
+    def test_create_post_without_disclaimer(self):
+        post_data_no_disclaimer = {'content': 'Another test post content', 'visibility': 'public'}
+        response = self.client.post('/content/posts/', post_data_no_disclaimer)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotIn('disclaimer', response.data)
+    
+    def test_update_post_to_empty_disclaimer(self):
+        update_data = {'disclaimer': ''}
+        response = self.client.patch(f'/content/posts/{self.post.id}/', update_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.disclaimer, '')
+
+
+class PostVisibilityTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='user1', password='password1')
+        self.client.login(username='user1', password='password1')
+        self.post = Post.objects.create(user=self.user, content="Test Post", visibility="public")
+    
+    def test_create_post_with_visibility(self):
+        data = {'content': 'New test post', 'visibility': 'private'}
+        response = self.client.post('/posts/', data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['visibility'], 'private')
+    
+    def test_edit_post_visibility(self):
+        update_data = {'visibility': 'friends'}
+        response = self.client.patch(f'/posts/{self.post.id}/update_visibility/', update_data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.post.refresh_from_db()
+        self.assertEqual(self.post.visibility, 'friends')
+    
+    def test_unauthorized_edit_visibility(self):
+        new_user = User.objects.create_user(username='otheruser', password='password123')
+        self.client.force_authenticate(user=new_user)
+        response = self.client.patch(f'/posts/{self.post.id}/update_visibility/', {'visibility': 'private'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PostInteractionViewSetTests(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(username='user1', password='password1')
+        self.user2 = User.objects.create_user(username='user2', password='password2')
+        self.post = Post.objects.create(user=self.user1, content="Test Post")
+        self.client.login(username='user1', password='password1')
+    
+    def test_list_likes(self):
+        Like.objects.create(post=self.post, user=self.user2)
+        response = self.client.get(f'/api/posts/{self.post.id}/interactions/likes/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['username'], 'user2')
+    
+    def test_list_shares(self):
+        Share.objects.create(post=self.post, user=self.user2)
+        response = self.client.get(f'/api/posts/{self.post.id}/interactions/shares/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['username'], 'user2')
+    
+    def test_list_comments(self):
+        Comment.objects.create(post=self.post, user=self.user2, content="Nice post!")
+        response = self.client.get(f'/api/posts/{self.post.id}/interactions/comments/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['username'], 'user2')
+        self.assertEqual(response.data[0]['content'], "Nice post!")
+    
+    def test_no_interactions(self):
+        response_likes = self.client.get(f'/api/posts/{self.post.id}/interactions/likes/')
+        response_shares = self.client.get(f'/api/posts/{self.post.id}/interactions/shares/')
+        response_comments = self.client.get(f'/api/posts/{self.post.id}/interactions/comments/')
+        self.assertEqual(response_likes.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_shares.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_comments.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_likes.data), 0)
+        self.assertEqual(len(response_shares.data), 0)
+        self.assertEqual(len(response_comments.data), 0)

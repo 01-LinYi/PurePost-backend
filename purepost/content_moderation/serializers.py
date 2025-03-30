@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Folder, SavedPost, Share, Comment
+from .models import Post, Folder, SavedPost, Like, Share, Comment
 from django.contrib.auth import get_user_model
 
 
@@ -8,9 +8,22 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private']
+        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private', 'disclaimer']
         read_only_fields = ['email', 'is_private']
 
+class LikeSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    post = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Like
+        fields = ['id', 'user', 'post', 'liked_at']
+        read_only_fields = ['user', 'post', 'liked_at']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        validated_data['user'] = request.user
+        return super().create(validated_data)
 
 class ShareSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -58,11 +71,11 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'content', 'image', 'video',
             'visibility', 'like_count', 'share_count', 'comment_count',
-            'created_at', 'updated_at', 'is_liked', 'is_saved'
+            'created_at', 'updated_at', 'is_liked', 'is_saved', 'disclaimer'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
-            'created_at', 'updated_at', 'is_liked', 'is_saved'
+            'created_at', 'updated_at', 'is_liked', 'is_saved', 'disclaimer'
         ]
 
     def get_is_liked(self, obj):
@@ -96,7 +109,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Post
-        fields = ['content', 'image', 'video', 'visibility']
+        fields = ['content', 'image', 'video', 'visibility', 'disclaimer']
 
     def validate(self, data):
         if not (data.get('content') or data.get('image') or data.get('video')):
@@ -191,4 +204,3 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
-
