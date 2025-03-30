@@ -104,3 +104,55 @@ class Like(models.Model):
 
     def __str__(self):
         return f"{self.user.username} liked post #{self.post.id}"
+
+
+class Share(models.Model):
+    """Share model - Users can share posts"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shares")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="shares")
+    shared_at = models.DateTimeField(auto_now_add=True)
+    comment = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'content_moderation_share'
+        verbose_name = 'Share'
+        verbose_name_plural = 'Shares'
+        ordering = ['-shared_at']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'post'], name='unique_share')
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} shared post #{self.post.id}"
+
+
+class Comment(models.Model):
+    """Comment model - Users can reply to posts"""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comments")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+    content = models.TextField()
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, related_name="replies", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'content_moderation_comment'
+        verbose_name = 'Comment'
+        verbose_name_plural = 'Comments'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.user.username} commented on post #{self.post.id}"
+    
+    def delete(self, *args, **kwargs):
+        """Override delete method to handle comment count and replies"""
+        # If this comment has replies, delete them first
+        if self.replies.exists():
+            self.replies.all().delete()
+        
+        # Decrement the comment count on the associated post
+        self.post.comment_count = models.F('comment_count') - 1
+        self.post.save()
+
+        # Call the superclass delete method to actually delete the comment
+        super().delete(*args, **kwargs)
+    
