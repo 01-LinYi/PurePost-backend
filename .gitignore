@@ -54,3 +54,30 @@ logs/
 
 temp/
 tmp/
+
+# models
+dfdetect_service/model/*.onnx
+dfdetect_service/model/*.pt
+dfdetect_service/model/*.pth
+dfdetect_service/model/*.h5
+dfdetect_service/model/*.pb
+dfdetect_service/model/*.tflite
+dfdetect_service/model/*weights*
+
+
+!dfdetect_service/model/.gitkeep
+!dfdetect_service/model/labels.txt
+!dfdetect_service/model/README.md
+
+
+dfdetect_service/__pycache__/
+dfdetect_service/*.py[cod]
+dfdetect_service/*$py.class
+dfdetect_service/logs/
+dfdetect_service/temp/
+dfdetect_service/tmp/
+
+
+dfdetect_service/.env
+dfdetect_service/venv/
+dfdetect_service/env/
