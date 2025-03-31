@@ -35,10 +35,10 @@ The backend repository handles user management, content posting, social interact
 - **Frontend**: React Native (Cross-platform mobile app)
 - **Backend**: Django (Python)
 - **Database**: TBD
-- **Storage**: TBD
+- **Storage**: MinIO
 - **AI Service**: TensorFlow/PyTorch
 - **API Gateway**: Django REST Framework (DRF)
-- **Deployment**: TBD
+- **Deployment**: Docker
 
 ---
 

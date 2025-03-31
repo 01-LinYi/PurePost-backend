@@ -22,6 +22,8 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost").split(",")
 
 # Installed apps
 INSTALLED_APPS = [
+    "storages",
+
     # Django apps
     "daphne",
     "django.contrib.admin",
@@ -47,7 +49,7 @@ INSTALLED_APPS = [
 
 # Middleware
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",  # CORS headers
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -84,7 +86,7 @@ TEMPLATES = [
 # WSGI application
 WSGI_APPLICATION = "purepost.wsgi.application"
 
-# Database configuration (using SQLite for local development)
+# Database configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -111,7 +113,6 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = os.getenv("REDIS_PORT", 6379)
 
 # Authentication and user model
-# Use the custom user model from auth_service
 AUTH_USER_MODEL = "auth_service.User"
 
 # Password validation
@@ -161,9 +162,97 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-# Static files and media configuration
-STATIC_URL = "/static/"
-MEDIA_ROOT = BASE_DIR / "purepost/media"
+# Storage settings. compatible with S3, Django 5
+USE_S3 = os.getenv('USE_S3', 'True') == 'True'
+
+if USE_S3:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "bucket_name": os.getenv('AWS_STORAGE_BUCKET_NAME', 'purepost-media'),
+
+
+                "access_key": os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin'),
+                "secret_key": os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
+
+
+                "endpoint_url": os.getenv('AWS_S3_ENDPOINT_URL', 'http://localhost:9000'),
+                "region_name": os.getenv('AWS_S3_REGION_NAME', 'us-east-1'),
+
+
+                "addressing_style": "path",
+                "signature_version": "s3v4",
+
+
+                "verify": os.getenv('AWS_S3_VERIFY', 'False') == 'True',
+                "default_acl": "public-read",
+
+
+                "querystring_auth": False,
+
+
+                "file_overwrite": True,
+                "max_memory_size": 10 * 1024 * 1024,  # 10MB
+
+
+                "object_parameters": {
+                    "CacheControl": "max-age=86400",
+                },
+                "custom_domain": None,
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+            "OPTIONS": {
+
+                "bucket_name": os.getenv('AWS_STORAGE_BUCKET_NAME', 'purepost-media'),
+                "location": "static",
+
+
+                "access_key": os.getenv('AWS_ACCESS_KEY_ID', 'minioadmin'),
+                "secret_key": os.getenv('AWS_SECRET_ACCESS_KEY', 'minioadmin'),
+
+
+                "endpoint_url": os.getenv('AWS_S3_ENDPOINT_URL', 'http://localhost:9000'),
+                "region_name": os.getenv('AWS_S3_REGION_NAME', 'us-east-1'),
+
+                "addressing_style": "path",
+                "signature_version": "s3v4",
+
+
+                "verify": os.getenv('AWS_S3_VERIFY', 'False') == 'True',
+                "default_acl": "public-read",
+
+
+                "querystring_auth": False,
+
+
+                "file_overwrite": True,
+            },
+        },
+    }
+
+    AWS_S3_ENDPOINT_URL = os.getenv(
+        'AWS_S3_ENDPOINT_URL', 'http://localhost:9000')
+    AWS_STORAGE_BUCKET_NAME = os.getenv(
+        'AWS_STORAGE_BUCKET_NAME', 'purepost-media')
+    MEDIA_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/"
+    STATIC_URL = f"{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/static/"
+else:
+    # Use local file storage
+    MEDIA_ROOT = BASE_DIR / "uploads"
+    MEDIA_URL = "/media/"
+    STATIC_URL = "/static/"
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

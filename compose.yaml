@@ -11,27 +11,87 @@ services:
   server:
     build:
       context: .
-    environment:
-      - IS_PROD=True
     env_file: .env.prod
     ports:
       - "8000:8000"
-  
+    depends_on:
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      - IS_PROD=True
+      - DEBUG=False
+      - SECRET_KEY=mysecretkey
+      - ALLOWED_HOSTS=localhost,127.0.0.1
+      
+      # MinIO configuration
+      - USE_S3=True
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_STORAGE_BUCKET_NAME=purepost-media
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_S3_VERIFY=False
+      
+      # Redis configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
   redis:
-    image: redis
+    image: redis:7
     restart: always
     expose:
       - 6379
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
       - redis-data:/data
 
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: on-failure
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+
+      /usr/bin/mc mb myminio/purepost-media || true;
+
+      /usr/bin/mc anonymous set download myminio/purepost-media;
+
+      echo 'MinIO initialization completed successfully!';
+      echo 'Created bucket: purepost-media';
+      "
+
 volumes:
   redis-data:
+  minio-data:
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
@@ -65,4 +125,3 @@ volumes:
 # secrets:
 #   db-password:
 #     file: db/password.txt
-
