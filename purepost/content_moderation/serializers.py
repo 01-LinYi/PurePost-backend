@@ -109,7 +109,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Post
-        fields = ['content', 'image', 'video', 'visibility', 'disclaimer']
+        fields = ['id', 'content', 'image', 'video', 'visibility', 'disclaimer']
 
     def validate(self, data):
         if not (data.get('content') or data.get('image') or data.get('video')):

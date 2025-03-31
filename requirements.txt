@@ -6,3 +6,8 @@ channels[daphne]
 channels_redis
 Pillow
 asgiref
+boto3
+django-storages
+python-dotenv
+celery
+redis

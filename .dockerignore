@@ -30,5 +30,7 @@
 **/obj
 **/secrets.dev.yaml
 **/values.dev.yaml
+
+dfdetect_service/
 LICENSE
 README.md
