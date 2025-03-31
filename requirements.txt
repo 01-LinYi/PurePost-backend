@@ -6,3 +6,4 @@ channels[daphne]
 channels_redis
 Pillow
 asgiref
+python-dotenv

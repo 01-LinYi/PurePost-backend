@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Profile
+from ..social_service.models import Follow
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -11,6 +12,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     is_active = serializers.BooleanField(
         source="user.is_active", read_only=True)
+    is_followed = serializers.SerializerMethodField()  # whether the current user follows the returning profile
 
     class Meta:
         model = Profile
@@ -26,6 +28,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "is_active",  # Profile has a foreign key to the User model
+            "is_followed",
         ]
         # These fields cannot be modified
         read_only_fields = ["username", "email",
@@ -61,3 +64,12 @@ class ProfileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "The date of birth cannot be in the future.")
         return value
+
+    def get_is_followed(self, obj):
+        """
+        Custom method to check if the currently logged-in user follows the profile user.
+        """
+        request = self.context.get('request')  # Access the request from the serializer context
+        if request and request.user.is_authenticated:  # Ensure the user is logged in
+            return Follow.objects.filter(follower=request.user, following=obj.user).exists()
+        return False  # If the user is not logged in, return False as the default

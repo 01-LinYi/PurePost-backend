@@ -1,12 +1,18 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# load environment vars from .env
+if os.getenv("IS_PROD", "False") == "True":
+    load_dotenv(".env.prod")
+else:
+    load_dotenv(".env.dev")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key for Django project
-SECRET_KEY = os.getenv(
-    "DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
 
 # Debug mode
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -32,11 +38,11 @@ INSTALLED_APPS = [
     "corsheaders",
 
     # Custom apps
-    "purepost.auth_service",    # Auth Service app
-    "purepost.user_service",    # User Service app
-    "purepost.message_service", # Message Service app
+    "purepost.auth_service",  # Auth Service app
+    "purepost.user_service",  # User Service app
+    "purepost.message_service",  # Message Service app
     "purepost.content_moderation",  # Post Service app
-
+    "purepost.social_service",  # Social Service app
 ]
 
 # Middleware
@@ -114,11 +120,22 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # REST framework configuration
 REST_FRAMEWORK = {
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.CursorPagination",
+    "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
 }
+
+# Email
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT", 587)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False") == "True"
 
 # JWT settings
 SIMPLE_JWT = {
@@ -137,8 +154,7 @@ USE_TZ = True
 
 # Static files and media configuration
 STATIC_URL = "/static/"
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = BASE_DIR / "purepost/media"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -148,7 +164,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("localhost", 6379)], # TODO: user variable instead of hardcode
+            "hosts": [(os.getenv("REDIS_HOST", "localhost"), os.getenv("REDIS_PORT", 6379))],
         },
     },
 }
@@ -168,7 +184,7 @@ LOGGING = {
     "loggers": {
         "django": {
             "handlers": ["console"],
-            "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
+            "level": os.getenv("LOG_LEVEL", "INFO"),
             "propagate": False,
         },
     },
