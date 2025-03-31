@@ -21,9 +21,9 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     disclaimer = models.CharField(max_length=200, blank=True, null=True)
 
-    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
-    shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
-    comments = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Comment", related_name="commented_posts")
+    # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
+    # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
+    # comments = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Comment", related_name="commented_posts")
     
     class Meta:
         """Model metadata"""
