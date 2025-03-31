@@ -6,6 +6,7 @@ class Post(models.Model):
     VISIBILITY_CHOICES = (
         ('public', 'Public'),
         ('private', 'Private'),
+        ('friends', 'Friends-Only'),
     )
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="posts")
@@ -18,7 +19,12 @@ class Post(models.Model):
     comment_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    disclaimer = models.CharField(max_length=200, blank=True, null=True)
 
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
+    shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
+    comments = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Comment", related_name="commented_posts")
+    
     class Meta:
         """Model metadata"""
         db_table = 'content_moderation_post'

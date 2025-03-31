@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status, permissions, filters
+from rest_framework import viewsets, status, permissions, filters, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
@@ -8,9 +8,52 @@ from .models import Post, Folder, SavedPost, Share, Comment
 from .serializers import (
     PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    CommentSerializer, ShareSerializer
+    LikeSerializer, CommentSerializer, ShareSerializer
 )
 from .permissions import IsOwnerOrReadOnly
+
+
+from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth import get_user_model
+from .serializers import UserSerializer, PostSerializer
+
+User = get_user_model()
+
+
+class ProfilePostPagination(PageNumberPagination):
+
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 50
+
+
+class UserProfileView(generics.ListAPIView):
+    """
+    API endpoint to view a user's profile and posts with permission control.
+    """
+    serializer_class = PostSerializer
+    pagination_class = ProfilePostPagination
+
+    def get(self, request, username, *args, **kwargs):
+        user = get_object_or_404(User, username=username)
+        profile_serializer = UserSerializer(user, context={'request': request})
+
+        # Check privacy settings
+        if user.is_private and user != request.user:
+            return Response({'detail': 'This profile is private.'}, status=403)
+
+        # Retrieve visible posts
+        posts = Post.objects.filter(user=user).order_by('-created_at')
+        if user != request.user:
+            posts = posts.filter(visibility='public')  # Only show public posts for others
+
+        page = self.paginate_queryset(posts)
+        post_serializer = PostSerializer(page, many=True, context={'request': request})
+
+        return self.get_paginated_response({
+            'profile': profile_serializer.data,
+            'posts': post_serializer.data
+        })
 
 
 class PostViewSet(viewsets.ModelViewSet):
@@ -26,7 +69,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         """Choose appropriate serializer based on action type"""
-        if self.action == 'create':
+        if self.action in ['create', 'update']:
             return PostCreateSerializer
         return PostSerializer
 
@@ -56,6 +99,10 @@ class PostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set current user as author when creating a post"""
         serializer.save(user=self.request.user)
+    
+    def perform_update(self, serializer):
+        """Update post and handle disclaimer"""
+        serializer.save()
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def like(self, request, pk=None):
@@ -161,6 +208,21 @@ class PostViewSet(viewsets.ModelViewSet):
             post.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['patch'])
+    def update_visibility(self, request, pk=None):
+        """Allows users to update post visibility."""
+        post = self.get_object()
+        if post.user != request.user:
+            return Response({'error': 'Unauthorized'}, status=403)
+        
+        new_visibility = request.data.get('visibility')
+        if new_visibility not in ['public', 'private', 'friends']:
+            return Response({'error': 'Invalid visibility option'}, status=400)
+
+        post.visibility = new_visibility
+        post.save()
+        return Response({'message': 'Visibility updated', 'visibility': post.visibility})
 
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -261,3 +323,30 @@ class SavedPostViewSet(viewsets.ModelViewSet):
                     "saved_post": serializer.data},
                 status=status.HTTP_201_CREATED
             )
+
+
+class PostInteractionViewSet(viewsets.ViewSet):
+    """ViewSet for retrieving post interactions (likes, shares, comments)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def list_likes(self, request, post_id=None):
+        """Retrieve the list of users who liked a post"""
+        post = get_object_or_404(Post, id=post_id)
+        users = User.objects.filter(like__post=post).distinct()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    def list_shares(self, request, post_id=None):
+        """Retrieve the list of users who shared a post."""
+        post = get_object_or_404(Post, id=post_id)
+        users = User.objects.filter(share__post=post).distinct()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    def list_comments(self, request, post_id=None):
+        """Retrieve the list of comments for a post"""
+        post = get_object_or_404(Post, id=post_id)
+        comments = post.comments.filter(parent=None)
+        serializer = CommentSerializer(comments, many=True)
+        return Response(serializer.data)

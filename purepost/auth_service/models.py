@@ -5,5 +5,16 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
 
+    followings = models.ManyToManyField('self', symmetrical=False, related_name="followers", blank=True)
+
+    is_private = models.BooleanField(default=False)
+
     def __str__(self):
         return self.username
+    
+    def follow(self, user):
+        if user != self:
+            self.followings.add(user)
+
+    def unfollow(self, user):
+        self.followings.remove(user)

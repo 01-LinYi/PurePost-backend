@@ -22,3 +22,15 @@ class AuthTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
         response = self.client.post('/auth/delete-account/', {"password": "testpassword"})
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+    def test_follow_user(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        response = self.client.post(f'/auth/follow/{self.other_user.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unfollow_user(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token.key}')
+        self.client.post(f'/auth/follow/{self.other_user.id}/')  # First follow
+        response = self.client.post(f'/auth/unfollow/{self.other_user.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
