@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from .models import Post, Folder, SavedPost
+from .models import Post, Folder, SavedPost, Comment
 import tempfile
 from PIL import Image
 import json
@@ -219,6 +219,120 @@ class PostAPITestCase(APITestCase):
         # Verify like count decreased
         self.public_post.refresh_from_db()
         self.assertEqual(self.public_post.like_count, 0)
+
+
+    def test_share_post(self):
+        """Test sharing a post"""
+        self.client.force_authenticate(user=self.user2)
+        response = self.client.post(
+            reverse('post-share', kwargs={'pk': self.public_post.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify share count increased
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.share_count, 1)
+
+    def test_comment_on_post(self):
+        """Test commenting on a post"""
+        self.client.force_authenticate(user=self.user2)
+        comment_data = {
+            'content': 'This is a test comment.'
+        }
+        response = self.client.post(
+            reverse('post-comment', kwargs={'pk': self.public_post.id}),
+            data=comment_data
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        # Verify comment count increased
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comment_count, 1)
+
+        # Verify the content of the comment
+        self.assertEqual(self.public_post.comments.last().content, 'This is a test comment.')
+        
+
+    def test_delete_comment(self):
+        """Test deleting a comment"""
+        # Authenticate as the comment owner (user2)
+        self.client.force_authenticate(user=self.user2)
+
+        # Delete the comment
+        response = self.client.delete(
+            reverse('post-delete-comment', kwargs={'pk': self.public_post.id}),
+            data={'comment_id': self.comment.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify the comment is deleted
+        self.assertFalse(Comment.objects.filter(id=self.comment.id).exists())
+
+        # Verify the comment count on the post is decremented
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comment_count, 0)
+
+    def test_delete_comment_as_admin(self):
+        """Test deleting a comment as an admin"""
+        # Create an admin user
+        admin_user = User.objects.create_user(username='admin', password='admin123', is_staff=True)
+        self.client.force_authenticate(user=admin_user)
+
+        # Delete the comment
+        response = self.client.delete(
+            reverse('post-delete-comment', kwargs={'pk': self.public_post.id}),
+            data={'comment_id': self.comment.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify the comment is deleted
+        self.assertFalse(Comment.objects.filter(id=self.comment.id).exists())
+
+        # Verify the comment count on the post is decremented
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comment_count, 0)
+
+    def test_delete_comment_unauthorized(self):
+        """Test deleting a comment as a non-owner/non-admin"""
+        # Authenticate as a different user (user1, who is not the comment owner)
+        self.client.force_authenticate(user=self.user1)
+
+        # Attempt to delete the comment
+        response = self.client.delete(
+            reverse('post-delete-comment', kwargs={'pk': self.public_post.id}),
+            data={'comment_id': self.comment.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Verify the comment still exists
+        self.assertTrue(Comment.objects.filter(id=self.comment.id).exists())
+
+        # Verify the comment count on the post remains unchanged
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comment_count, 1)
+
+    def test_delete_comment_with_replies(self):
+        """Test deleting a comment that has replies"""
+        # Create a reply to the comment
+        reply = Comment.objects.create(user=self.user1, post=self.public_post, content="This is a reply", parent=self.comment)
+
+        # Authenticate as the comment owner (user2)
+        self.client.force_authenticate(user=self.user2)
+
+        # Delete the parent comment
+        response = self.client.delete(
+            reverse('post-delete-comment', kwargs={'pk': self.public_post.id}),
+            data={'comment_id': self.comment.id}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify the parent comment and its reply are deleted
+        self.assertFalse(Comment.objects.filter(id=self.comment.id).exists())
+        self.assertFalse(Comment.objects.filter(id=reply.id).exists())
+
+        # Verify the comment count on the post is decremented
+        self.public_post.refresh_from_db()
+        self.assertEqual(self.public_post.comment_count, 0)
 
 
 class FolderAPITestCase(APITestCase):

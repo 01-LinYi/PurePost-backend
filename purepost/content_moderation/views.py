@@ -4,10 +4,11 @@ from rest_framework.response import Response
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from .models import Post, Folder, SavedPost
+from .models import Post, Folder, SavedPost, Share, Comment
 from .serializers import (
     PostSerializer, PostCreateSerializer,
-    FolderSerializer, SavedPostSerializer, SavedPostListSerializer
+    FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
+    CommentSerializer, ShareSerializer
 )
 from .permissions import IsOwnerOrReadOnly
 
@@ -100,6 +101,66 @@ class PostViewSet(viewsets.ModelViewSet):
             post.save()
 
         return Response({"detail": "Post unliked successfully"}, status=status.HTTP_200_OK)
+    
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def comment(self, request, pk=None):
+        """Add a comment to a post"""
+        post = self.get_object()
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, post=post)
+            post.comment_count += 1
+            post.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+    @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAuthenticated])
+    def delete_comment(self, request, pk=None):
+        """Delete a comment"""
+        post = self.get_object()
+        comment_id = request.data.get('comment_id')
+
+        if not comment_id:
+            return Response(
+                {"detail": "Comment ID is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Fetch the comment
+        comment = get_object_or_404(Comment, id=comment_id, post=post)
+
+        # Ensure the user is the owner of the comment or an admin
+        if comment.user != request.user and not request.user.is_staff:
+            return Response(
+                {"detail": "You do not have permission to delete this comment"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Delete the comment
+        comment.delete()
+
+        # Update the comment count on the post
+        post.comment_count = max(0, post.comment_count - 1)
+        post.save()
+
+        return Response(
+            {"detail": "Comment deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def share(self, request, pk=None):
+        """Share a post"""
+        post = self.get_object()
+        serializer = ShareSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user, post=post)
+            post.share_count += 1
+            post.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class FolderViewSet(viewsets.ModelViewSet):
