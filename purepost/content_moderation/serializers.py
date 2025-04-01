@@ -7,11 +7,13 @@ User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     bio = serializers.CharField(source='user_profile.bio', read_only=True)
-    profile_picture = serializers.ImageField(source='user_profile.avatar', read_only=True)
+    profile_picture = serializers.ImageField(
+        source='user_profile.avatar', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private']
+        fields = ['id', 'username', 'email',
+                  'bio', 'profile_picture', 'is_private']
 
 
 class LikeSerializer(serializers.ModelSerializer):
@@ -51,7 +53,8 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'post', 'content', 'parent', 'created_at', 'replies']
+        fields = ['id', 'user', 'post', 'content',
+                  'parent', 'created_at', 'replies']
         read_only_fields = ['user', 'post', 'created_at', 'replies']
 
     def get_replies(self, obj):
@@ -76,7 +79,8 @@ class PostSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'content', 'image', 'video',
             'visibility', 'like_count', 'share_count', 'comment_count',
-            'created_at', 'updated_at', 'is_liked', 'is_saved', 'disclaimer'
+            'created_at', 'updated_at', 
+            'is_liked', 'is_saved', 'disclaimer', 'deepfake_status',
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
@@ -113,7 +117,8 @@ class PostSerializer(serializers.ModelSerializer):
 class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
-        fields = ['id', 'content', 'image', 'video', 'visibility', 'disclaimer']
+        fields = ['id', 'content', 'image',
+                  'video', 'visibility', 'disclaimer']
 
     def validate(self, data):
         if not (data.get('content') or data.get('image') or data.get('video')):
