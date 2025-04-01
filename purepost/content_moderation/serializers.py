@@ -8,8 +8,8 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private', 'disclaimer']
-        read_only_fields = ['email', 'is_private']
+        fields = ['id', 'username', 'email'] # 'avatar', 'is_private', 'disclaimer']
+        read_only_fields = ['id', 'username', 'email'] # 'avatar', 'is_private', 'disclaimer']
 
 class LikeSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -70,8 +70,10 @@ class PostSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             'id', 'user', 'content', 'image', 'video',
+            'shares', 'comments',
             'visibility', 'like_count', 'share_count', 'comment_count',
-            'created_at', 'updated_at', 'is_liked', 'is_saved', 'disclaimer'
+            'created_at', 'updated_at', 'is_liked', 'is_saved', 
+            'disclaimer', 'deepfake_status', 'deepfake_score',
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
