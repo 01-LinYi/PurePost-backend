@@ -125,7 +125,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # REST framework configuration
 REST_FRAMEWORK = {
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.CursorPagination",
+    "DEFAULT_PAGINATION_CLASS": "purepost.BaseCursorPagination.BaseCursorPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.TokenAuthentication",

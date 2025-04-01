@@ -2,14 +2,17 @@ from rest_framework import serializers
 from .models import Post, Folder, SavedPost, Like, Share, Comment
 from django.contrib.auth import get_user_model
 
-
 User = get_user_model()
 
+
 class UserSerializer(serializers.ModelSerializer):
+    bio = serializers.CharField(source='user_profile.bio', read_only=True)
+    profile_picture = serializers.ImageField(source='user_profile.avatar', read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private', 'disclaimer']
-        read_only_fields = ['email', 'is_private']
+        fields = ['id', 'username', 'email', 'bio', 'profile_picture', 'is_private']
+
 
 class LikeSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -25,9 +28,10 @@ class LikeSerializer(serializers.ModelSerializer):
         validated_data['user'] = request.user
         return super().create(validated_data)
 
+
 class ShareSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    #post = PostSerializer(read_only=True)
+    # post = PostSerializer(read_only=True)
     post = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
@@ -39,6 +43,7 @@ class ShareSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         validated_data['user'] = request.user
         return super().create(validated_data)
+
 
 class CommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -56,15 +61,15 @@ class CommentSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         validated_data['user'] = request.user
         return super().create(validated_data)
-    
-    
+
+
 class PostSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_saved = serializers.SerializerMethodField()
-    
-    shares = serializers.SerializerMethodField()
-    comments = serializers.SerializerMethodField()
+
+    # shares = serializers.SerializerMethodField()
+    # comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -90,13 +95,13 @@ class PostSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return SavedPost.objects.filter(user=request.user, post=obj).exists()
         return False
-    
+
     def get_shares(self, obj):
-        from .serializers import ShareSerializer 
+        from .serializers import ShareSerializer
         return ShareSerializer(obj.shares.all(), many=True).data
-    
+
     def get_comments(self, obj):
-        from .serializers import CommentSerializer 
+        from .serializers import CommentSerializer
         return CommentSerializer(obj.comments.filter(parent=None), many=True).data
 
     def create(self, validated_data):
@@ -106,7 +111,6 @@ class PostSerializer(serializers.ModelSerializer):
 
 
 class PostCreateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Post
         fields = ['id', 'content', 'image', 'video', 'visibility', 'disclaimer']
