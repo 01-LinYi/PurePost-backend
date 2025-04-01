@@ -24,6 +24,7 @@ cachetools
 # Testing
 httpx
 pytest
+requests
 
 # Production
 gunicorn

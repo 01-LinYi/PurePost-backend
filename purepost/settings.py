@@ -12,7 +12,8 @@ else:
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key for Django project
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY", "on2CD_Ti8EFgXMHFw5Hn2OvuAuo4fE4Nip7DovcSkQBcjtweJvA7-ZL3oX3-Sdb74eg")
 
 # Debug mode
 DEBUG = os.getenv("DEBUG", "False") == "True"
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
     "purepost.message_service",  # Message Service app
     "purepost.content_moderation",  # Post Service app
     "purepost.social_service",  # Social Service app
+    "purepost.deepfake_detection",  # Deepfake Detection app
 ]
 
 # Middleware
@@ -253,6 +255,14 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
+
+# Deepfake detection microservice settings
+DFDETECT_SERVICE_URL = os.getenv(
+    "DFDETECT_SERVICE_URL", "http://localhost:5555")
+
+DFDETECT_SERVICE_TIMEOUT = 30  # Seconds
+DEEPFAKE_THRESHOLD = 0.7  # Threshold for alert notifications
+
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
