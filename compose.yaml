@@ -21,12 +21,14 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      dfdetect-service:
+        condition: service_healthy
     environment:
       - IS_PROD=True
       - DEBUG=False
       - SECRET_KEY=mysecretkey
       - ALLOWED_HOSTS=localhost,127.0.0.1
-      
+
       # MinIO configuration
       - USE_S3=True
       - AWS_ACCESS_KEY_ID=minioadmin
@@ -34,10 +36,30 @@ services:
       - AWS_STORAGE_BUCKET_NAME=purepost-media
       - AWS_S3_ENDPOINT_URL=http://minio:9000
       - AWS_S3_VERIFY=False
-      
+
       # Redis configuration
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+
+      # DeepFake detection service URL
+      - DFDETECT_SERVICE_URL=http://dfdetect-service:5555
+
+  dfdetect-service:
+    build: ./dfdetect_service
+    volumes:
+      - ./dfdetect_service/model:/app/model
+    ports:
+      - "5555:5555"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   redis:
     image: redis:7
@@ -92,7 +114,6 @@ services:
 volumes:
   redis-data:
   minio-data:
-
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
 # start the database before your application. The `db-data` volume persists the
