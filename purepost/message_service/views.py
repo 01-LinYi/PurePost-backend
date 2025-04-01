@@ -20,7 +20,6 @@ class ConversationView(GenericAPIView):
     """
     permission_classes = [IsAuthenticated]
     serializer_class = ConversationSerializer
-    pagination_class = None
 
     def get_queryset(self):
         """
