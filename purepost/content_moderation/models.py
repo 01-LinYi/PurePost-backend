@@ -8,6 +8,13 @@ class Post(models.Model):
         ('private', 'Private'),
         ('friends', 'Friends-Only'),
     )
+    DEEPFAKE_CHOICES = (
+        ('not_analyzed', 'Not Analyzed'),
+        ('analyzing', 'Analyzing'),
+        ('flagged', 'Flagged as Deepfake'),
+        ('not_flagged', 'Not Flagged (Real)'),
+        ('analysis_failed', 'Analysis Failed')
+    )
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="posts")
     content = models.TextField(blank=True, null=True)
@@ -20,6 +27,17 @@ class Post(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     disclaimer = models.CharField(max_length=200, blank=True, null=True)
+    deepfake_status = models.CharField(
+        max_length=20,
+        choices=DEEPFAKE_CHOICES,
+        default='not_analyzed',
+        help_text="Status of deepfake detection"
+    )
+    deepfake_score = models.FloatField(
+        null=True, 
+        blank=True,
+        help_text="Confidence score for deepfake detection"
+    )
 
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
