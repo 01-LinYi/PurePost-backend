@@ -96,7 +96,17 @@ class PostViewSet(viewsets.ModelViewSet):
         # Filter by pin status, default to all
         is_pinned = self.request.query_params.get('is_pinned')
         if is_pinned:
-            queryset = queryset.filter(pinned=is_pinned)
+            pinned = None
+            if is_pinned == 'true' or is_pinned == 'True':
+                pinned = True
+            elif is_pinned == 'false' or is_pinned == 'False':
+                pinned = False
+            else:
+                return Response(
+                    {"detail": "Invalid value for is_pinned parameter"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            queryset = queryset.filter(pinned=pinned)
 
         return queryset
 
