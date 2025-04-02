@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 
+
 class Post(models.Model):
     """Post model - Content that users can publish, including text, images, and videos"""
     VISIBILITY_CHOICES = (
@@ -15,7 +16,7 @@ class Post(models.Model):
         ('not_flagged', 'Not Flagged (Real)'),
         ('analysis_failed', 'Analysis Failed')
     )
-    
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="posts")
     content = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to="posts/images/", blank=True, null=True)
@@ -26,6 +27,7 @@ class Post(models.Model):
     comment_count = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    pinned = models.BooleanField(default=False)
     disclaimer = models.CharField(max_length=200, blank=True, null=True)
     deepfake_status = models.CharField(
         max_length=20,
@@ -34,7 +36,7 @@ class Post(models.Model):
         help_text="Status of deepfake detection"
     )
     deepfake_score = models.FloatField(
-        null=True, 
+        null=True,
         blank=True,
         help_text="Confidence score for deepfake detection"
     )
@@ -42,7 +44,7 @@ class Post(models.Model):
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
     # comments = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Comment", related_name="commented_posts")
-    
+
     class Meta:
         """Model metadata"""
         db_table = 'content_moderation_post'
@@ -53,13 +55,13 @@ class Post(models.Model):
     def __str__(self):
         """String representation"""
         return f"Post by {self.user.username} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
-    
+
     def save(self, *args, **kwargs):
         """Override save method to handle image/video mutual exclusivity"""
         # Ensure at least content, image, or video is present
         if not (self.content or self.image or self.video):
             raise ValueError("Post must have at least content, image, or video")
-            
+
         super().save(*args, **kwargs)
 
 
@@ -108,6 +110,7 @@ class SavedPost(models.Model):
         """String representation"""
         folder_name = self.folder.name if self.folder else "No Folder"
         return f"{self.user.username} saved post #{self.post.id} in {folder_name}"
+
 
 class Like(models.Model):
     user = models.ForeignKey(
@@ -166,17 +169,16 @@ class Comment(models.Model):
 
     def __str__(self):
         return f"{self.user.username} commented on post #{self.post.id}"
-    
+
     def delete(self, *args, **kwargs):
         """Override delete method to handle comment count and replies"""
         # If this comment has replies, delete them first
         if self.replies.exists():
             self.replies.all().delete()
-        
+
         # Decrement the comment count on the associated post
         self.post.comment_count = models.F('comment_count') - 1
         self.post.save()
 
         # Call the superclass delete method to actually delete the comment
         super().delete(*args, **kwargs)
-    
