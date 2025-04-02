@@ -90,7 +90,7 @@ async def predict_image(file: UploadFile = File(...)):
     Returns prediction results with confidence scores
     """
     start_time = time.time()
-    
+    logger.info(f"Received file: {file.filename}, size: {file.size} bytes")
     try:
         # Validate file extension
         allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']

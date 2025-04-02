@@ -24,12 +24,16 @@ class DetectionResult:
     raw_data: Dict[str, Any]
 
 
+@shared_task(name="test_task")
+def test_task():
+    logger.info("Test task executed successfully")
+    return "success"
+
 @shared_task(
     bind=True,
-    max_retries=3,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=600,
+    max_retries=5, 
+    retry_backoff=2, 
+    retry_backoff_max=30,
     retry_jitter=True,
     name="process_image_analysis"
 )
@@ -47,17 +51,24 @@ def process_image_analysis(self, analysis_id: str) -> dict:
     start_time = time.time()
 
     try:
-        # Get analysis record and mark as processing
-        with transaction.atomic():
-            analysis = ImageAnalysis.objects.select_for_update().get(id=analysis_id)
+  
+        try:
+            with transaction.atomic():
+                analysis = ImageAnalysis.objects.select_for_update().get(id=analysis_id)
 
-            if analysis.status != 'pending':
-                logger.warning(
-                    f"Analysis {analysis_id} is not pending (status: {analysis.status}), skipping")
-                return {"status": analysis.status, "message": "Analysis was not in pending state"}
+                if analysis.status != 'pending':
+                    logger.warning(
+                        f"Analysis {analysis_id} is not pending (status: {analysis.status}), skipping")
+                    return {"status": analysis.status, "message": "Analysis was not in pending state"}
 
-            analysis.status = 'processing'
-            analysis.save(update_fields=['status', 'updated_at'])
+                analysis.status = 'processing'
+                analysis.save(update_fields=['status', 'updated_at'])
+        except ImageAnalysis.DoesNotExist:
+         
+            logger.warning(f"Analysis {analysis_id} not found, retrying...")
+            
+            countdown = 2 * (self.request.retries + 1)  # 2, 4, 6, 8, 10秒
+            raise self.retry(countdown=countdown)
 
         # Get image from Post
         if not analysis.post:
@@ -112,7 +123,8 @@ def process_image_analysis(self, analysis_id: str) -> dict:
 
     except ImageAnalysis.DoesNotExist:
         logger.error(f"Analysis {analysis_id} not found")
-        raise
+        countdown = 2 * (self.request.retries + 1)
+        raise self.retry(countdown=countdown)
 
     except Exception as e:
         logger.error(f"Error processing analysis {analysis_id}: {str(e)}")
@@ -131,7 +143,6 @@ def process_image_analysis(self, analysis_id: str) -> dict:
             raise self.retry(exc=e)
 
         raise
-
 
 @shared_task(
     autoretry_for=(Exception,),
@@ -287,7 +298,7 @@ def _mark_analysis_failed(analysis: ImageAnalysis, reason: str):
     analysis.status = 'failed'
     analysis.failure_reason = reason
     analysis.save(update_fields=['status', 'failure_reason', 'updated_at'])
-    
+
     # Update post status
     if analysis.post:
         try:
@@ -295,7 +306,7 @@ def _mark_analysis_failed(analysis: ImageAnalysis, reason: str):
             analysis.post.save(update_fields=['deepfake_status'])
         except Exception as e:
             logger.error(f"Error updating post status: {str(e)}")
-            
+
     logger.warning(f"Analysis {analysis.id} marked as failed: {reason}")
 
 
