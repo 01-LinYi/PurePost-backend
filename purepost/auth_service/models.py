@@ -4,6 +4,7 @@ from django.db import models
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
+    is_verified = models.BooleanField(default=False)
 
     followings = models.ManyToManyField('self', symmetrical=False, related_name="followers", blank=True)
 
