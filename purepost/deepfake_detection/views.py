@@ -1,4 +1,5 @@
 from django.db.models import Count, Avg
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
@@ -105,50 +106,58 @@ class ImageAnalysisViewSet(viewsets.ViewSet):
 
         Initiates deepfake detection analysis for the given post
         """
-        # Check if post exists
-        post = get_object_or_404(Post, id=post_id)
 
-        # Check if user has permission to analyze this post
-        if not request.user.is_staff and post.user != request.user:
-            return Response(
-                {"detail": "You do not have permission to analyze this post"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        with transaction.atomic():
+            # Check if post exists
+            post = get_object_or_404(Post, id=post_id)
 
-        # Check if an analysis already exists and is not failed
-        existing_analysis = ImageAnalysis.objects.filter(
-            post_id=post_id).exclude(status='failed').first()
-        if existing_analysis:
-            return Response(
-                {"detail": f"An analysis already exists for this post with status: {existing_analysis.status}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            # Check if user has permission to analyze this post
+            if not request.user.is_staff and post.user != request.user:
+                return Response(
+                    {"detail": "You do not have permission to analyze this post"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        # Create new analysis or find a failed one to reuse
-        analysis = ImageAnalysis.objects.filter(
-            post_id=post_id, status='failed').first()
-        if analysis:
-            # Reset the failed analysis
-            analysis.status = 'pending'
-            analysis.failure_reason = None
-            analysis.save(update_fields=['status', 'failure_reason'])
-        else:
-            # Create a new analysis
-            analysis = ImageAnalysis.objects.create(
-                post=post,
-                status='pending'
-            )
-            # Update post status
-            post.deepfake_status = 'analyzing'
-            post.save(update_fields=['deepfake_status'])
+            # Check if an analysis already exists and is not failed
+            existing_analysis = ImageAnalysis.objects.filter(
+                post_id=post_id).exclude(status='failed').first()
+            if existing_analysis:
+                return Response(
+                    {"detail": f"An analysis already exists for this post with status: {existing_analysis.status}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Queue the analysis task
-        task = process_image_analysis.delay(str(analysis.id))
-        analysis.task_id = task.id
-        analysis.save(update_fields=['task_id'])
+            # Create new analysis or find a failed one to reuse
+            analysis = ImageAnalysis.objects.filter(
+                post_id=post_id, status='failed').first()
+            if analysis:
+                # Reset the failed analysis
+                analysis.status = 'pending'
+                analysis.failure_reason = None
+                analysis.save(update_fields=['status', 'failure_reason'])
+            else:
+                # Create a new analysis
+                analysis = ImageAnalysis.objects.create(
+                    post=post,
+                    status='pending'
+                )
+                # Update post status
+                post.deepfake_status = 'analyzing'
+                post.save(update_fields=['deepfake_status'])
 
-        serializer = self.get_serializer(analysis)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            analysis_id = str(analysis.id)
+
+            
+            def queue_task():
+                task = process_image_analysis.delay(analysis_id)
+                ImageAnalysis.objects.filter(
+                    id=analysis_id).update(task_id=task.id)
+
+            transaction.on_commit(queue_task)
+
+            serializer = self.get_serializer(analysis)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def retry_by_post(self, request, post_id=None):
         """
@@ -180,7 +189,7 @@ class ImageAnalysisViewSet(viewsets.ViewSet):
             analysis.status = 'pending'
             analysis.failure_reason = None
             analysis.save(update_fields=['status', 'failure_reason'])
-            
+
             post.deepfake_status = 'analyzing'
             post.save(update_fields=['deepfake_status'])
             # Queue the analysis task

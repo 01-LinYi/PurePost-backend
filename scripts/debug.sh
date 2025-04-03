@@ -35,6 +35,15 @@ check_dependencies() {
         }
         log_success "boto3 installed successfully!"
     fi
+
+    if ! python -c "import celery" 2>/dev/null; then
+        log_warn "celery library not installed. Installing now..."
+        pip install celery -q || {
+            log_error "Failed to install celery. Please run: pip install celery"
+            exit 1
+        }
+        log_success "celery installed successfully!"
+    fi
 }
 
 # Service configuration
@@ -42,6 +51,7 @@ REDIS_NAME="redis-service"
 MINIO_NAME="minio-service"
 DJANGO_NAME="django-service"
 DFDETECT_NAME="dfdetect-service"
+CELERY_NAME="celery-worker"
 
 # Port configuration
 REDIS_PORT=6379
@@ -54,6 +64,8 @@ DFDETECT_PORT=5555
 MINIO_USER="minioadmin"
 MINIO_PASSWORD="minioadmin"
 MINIO_BUCKET="purepost-media"
+
+PROJECT_NAME="purepost"
 
 # Temporary directory path
 TEMP_DIR="/tmp/debug-script-temp"
@@ -163,6 +175,30 @@ start_dfdetect() {
     log_info "API URL: http://localhost:$DFDETECT_PORT/predict"
 }
 
+start_celery() {
+    log_info "Starting Celery worker..."
+
+    export DJANGO_SETTINGS_MODULE="${PROJECT_NAME}.settings"
+    export REDIS_HOST=localhost
+    export REDIS_PORT=$REDIS_PORT
+    export DFDETECT_SERVICE_URL=http://localhost:$DFDETECT_PORT
+    export AWS_S3_ENDPOINT_URL=http://localhost:$MINIO_API_PORT
+    export AWS_ACCESS_KEY_ID=$MINIO_USER
+    export AWS_SECRET_ACCESS_KEY=$MINIO_PASSWORD
+    export AWS_STORAGE_BUCKET_NAME=$MINIO_BUCKET
+
+    celery -A $PROJECT_NAME worker -l info &
+    CELERY_PID=$!
+
+    sleep 2
+    if ps -p $CELERY_PID >/dev/null; then
+        log_success "Celery worker started successfully! (PID: $CELERY_PID)"
+    else
+        log_error "Failed to start Celery worker"
+        return 1
+    fi
+}
+
 # Start Django
 start_django() {
     log_info "Starting Django development server..."
@@ -233,50 +269,59 @@ except Exception as e:
 # Stop all services
 stop_services() {
     log_info "Stopping all services..."
-    docker stop $REDIS_NAME $MINIO_NAME $DFDETECT_NAME >/dev/null || {
-        log_error "Failed to stop services"
-        return 1
-    }
+    docker stop $REDIS_NAME $MINIO_NAME $DFDETECT_NAME >/dev/null 2>&1 || true
+
+    if pgrep -f "celery -A $PROJECT_NAME worker" >/dev/null; then
+        log_info "Stopping Celery worker..."
+        pkill -f "celery -A $PROJECT_NAME worker" || true
+    fi
+
     log_success "All services stopped"
 }
 
 # Check service status
 check_status() {
-    log_info "Checking running containers..."
+    log_info "Checking running containers and services..."
 
-    echo "-----------------------------------------"
-    echo "| Service Name   | Status    | Ports     |"
-    echo "-----------------------------------------"
+    echo "-----------------------------------------------------"
+    echo "| Service Name       | Status    | Ports             |"
+    echo "-----------------------------------------------------"
 
     # Check Redis
     if docker ps --format '{{.Names}}' | grep -q "^${REDIS_NAME}$"; then
-        echo "| Redis          | Running   | $REDIS_PORT    |"
+        echo "| Redis              | Running   | $REDIS_PORT            |"
     else
-        echo "| Redis          | Stopped   | -         |"
+        echo "| Redis              | Stopped   | -                     |"
     fi
 
     # Check MinIO
     if docker ps --format '{{.Names}}' | grep -q "^${MINIO_NAME}$"; then
-        echo "| MinIO          | Running   | $MINIO_API_PORT,$MINIO_CONSOLE_PORT |"
+        echo "| MinIO              | Running   | $MINIO_API_PORT,$MINIO_CONSOLE_PORT |"
     else
-        echo "| MinIO          | Stopped   | -         |"
+        echo "| MinIO              | Stopped   | -                     |"
     fi
 
     # Check DeepFake Detection
     if docker ps --format '{{.Names}}' | grep -q "^${DFDETECT_NAME}$"; then
-        echo "| DeepFake Detect  | Running   | $DFDETECT_PORT    |"
+        echo "| DeepFake Detection | Running   | $DFDETECT_PORT            |"
     else
-        echo "| DeepFake Detect  | Stopped   | -         |"
+        echo "| DeepFake Detection | Stopped   | -                     |"
     fi
 
     # Check Django (simple port check)
     if netstat -tuln 2>/dev/null | grep -q ":$DJANGO_PORT "; then
-        echo "| Django         | Running   | $DJANGO_PORT    |"
+        echo "| Django             | Running   | $DJANGO_PORT            |"
     else
-        echo "| Django         | Stopped   | -         |"
+        echo "| Django             | Stopped   | -                     |"
     fi
 
-    echo "-----------------------------------------"
+    if pgrep -f "celery -A $PROJECT_NAME worker" >/dev/null; then
+        echo "| Celery Worker      | Running   | -                     |"
+    else
+        echo "| Celery Worker      | Stopped   | -                     |"
+    fi
+
+    echo "-----------------------------------------------------"
 }
 
 # Start all services in parallel
@@ -317,6 +362,13 @@ start_all_services() {
         exit 1
     }
 
+    # launch Celery worker
+    start_celery || {
+        log_error "Celery worker startup failed"
+        stop_services
+        exit 1
+    }
+
     log_success "All background services started successfully!"
     log_info "Starting Django server in foreground..."
 
@@ -329,10 +381,11 @@ show_help() {
     echo "Usage: ./debug.sh [command]"
     echo ""
     echo "Commands:"
-    echo "  start      Start all services (Redis, MinIO, Django)"
+    echo "  start      Start all services (Redis, MinIO, Django, Celery, etc.)"
     echo "  redis      Start only Redis service"
     echo "  minio      Start only MinIO service"
     echo "  dfdetect   Start only DeepFake Detection service"
+    echo "  celery     Start only Celery worker"          
     echo "  django     Start only Django server"
     echo "  stop       Stop all services"
     echo "  status     Check status of all services"
@@ -365,6 +418,13 @@ main() {
         ;;
     dfdetect)
         start_dfdetect
+        ;;
+    celery)
+        if ! docker ps --format '{{.Names}}' | grep -q "^${REDIS_NAME}$"; then
+            log_warn "Redis is not running. Starting Redis first..."
+            start_redis
+        fi
+        start_celery
         ;;
     django)
         start_django

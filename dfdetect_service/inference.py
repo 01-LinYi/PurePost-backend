@@ -86,6 +86,10 @@ def preprocess_image(image):
     Returns:
         np.ndarray: Preprocessed image as numpy array in NCHW format
     """
+    # Ensure the image is in RGB format
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
     # Resize to exact 224x224 (fast but may distort image)
     if image.size != INPUT_SIZE:
         image = image.resize(INPUT_SIZE, Image.BILINEAR)
@@ -103,6 +107,7 @@ def preprocess_image(image):
     img_array = img_array.transpose(2, 0, 1)
     # Add batch dimension
     img_array = np.expand_dims(img_array, axis=0)
+    logger.debug(f"Preprocessed image shape: {img_array.shape}")
     
     return img_array.astype(np.float32)  # Ensure float32 type for inference
 
@@ -201,6 +206,8 @@ def predict(image):
         
         # Sort results by confidence score (highest first)
         results = sorted(results, key=lambda x: x["score"], reverse=True)
+        
+        logger.debug(f"Prediction results: {results}")
         
         return results
     
