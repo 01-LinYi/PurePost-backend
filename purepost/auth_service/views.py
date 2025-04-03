@@ -47,6 +47,7 @@ class LoginView(APIView):
                         "id": user.id,
                         "username": user.username,
                         "email": user.email,
+                        "is_verified": user.is_verified,
                     },
                 },
                 status=status.HTTP_200_OK
@@ -129,8 +130,13 @@ class EmailVerificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @staticmethod
-    def post(request):
+    def get(request):
         user = request.user
+        if user.is_verified:
+            return Response(
+                {"error": "User is already verified"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Generate a random 6-digit code
         verification_code = random.randint(100000, 999999)
@@ -159,11 +165,16 @@ class EmailVerificationView(APIView):
         )
 
     @staticmethod
-    def get(request):
+    def post(request):
         user = request.user
+        if user.is_verified:
+            return Response(
+                {"error": "User is already verified"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Get the code from query params
-        verification_code = request.query_params.get("code")
+        verification_code = request.data.get("code")
 
         # Retrieve the verification code from Redis
         redis_key = f"email_verification:{user.id}"
@@ -175,6 +186,10 @@ class EmailVerificationView(APIView):
                 {"error": "Verification code is invalid or expired"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        # Marked user as verified
+        user.is_verified = True
+        user.save()
 
         # Remove the code from Redis after successful verification
         redis_client.delete(redis_key)

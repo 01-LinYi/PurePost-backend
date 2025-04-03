@@ -10,7 +10,7 @@ class UserBasicSerializer(serializers.ModelSerializer):
     """Serializer for basic user information"""
     class Meta:
         model = User
-        fields = ['id', 'username']
+        fields = ['id', 'username', 'email']
         read_only_fields = fields
 
 
