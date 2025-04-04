@@ -130,7 +130,7 @@ class EmailVerificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @staticmethod
-    def post(request):
+    def get(request):
         user = request.user
         if user.is_verified:
             return Response(
@@ -165,7 +165,7 @@ class EmailVerificationView(APIView):
         )
 
     @staticmethod
-    def get(request):
+    def post(request):
         user = request.user
         if user.is_verified:
             return Response(
@@ -174,7 +174,7 @@ class EmailVerificationView(APIView):
             )
 
         # Get the code from query params
-        verification_code = request.query_params.get("code")
+        verification_code = request.data.get("code")
 
         # Retrieve the verification code from Redis
         redis_key = f"email_verification:{user.id}"
