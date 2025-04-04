@@ -46,7 +46,7 @@ class MyProfileView(APIView):
         Handle GET requests to fetch the profile of the logged-in user.
         """
         profile: Profile = get_object_or_404(Profile, user=request.user)
-        serializer: ProfileSerializer = ProfileSerializer(profile)
+        serializer: ProfileSerializer = ProfileSerializer(profile, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
