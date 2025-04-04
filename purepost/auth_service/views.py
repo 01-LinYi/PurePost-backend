@@ -137,15 +137,9 @@ class UserVisibilityView(APIView):
         """Update user visibility."""
 
         # Convert string to boolean
-        is_private = None
-        req_is_private = request.data.get('isPrivate')
-        if req_is_private == "True" or req_is_private == "true":
-            is_private = True
-        elif req_is_private == "False" or req_is_private == "false":
-            is_private = False
-
+        is_private = request.data.get('isPrivate')
         if is_private is None:
-            return Response({"error": "Invalid isPrivate value"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "isPrivate is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         request.user.is_private = is_private
         request.user.save()
