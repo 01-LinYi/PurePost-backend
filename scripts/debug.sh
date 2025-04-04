@@ -67,8 +67,12 @@ MINIO_BUCKET="purepost-media"
 
 PROJECT_NAME="purepost"
 
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_DIR="$( cd "$SCRIPT_DIR/../" && pwd )"
+AVATAR_PATH="$REPO_DIR/purepost/media/avatars/defaults.png"
 # Temporary directory path
 TEMP_DIR="/tmp/debug-script-temp"
+
 
 # Ensure service is stopped
 ensure_service_stopped() {
@@ -142,7 +146,7 @@ start_minio() {
 # Ensure MinIO bucket exists
 ensure_minio_bucket() {
     log_info "Ensuring MinIO bucket '$MINIO_BUCKET' exists..."
-    create_bucket_python
+    initialize_minio
 }
 
 # Start DeepFake Detection Service
@@ -210,12 +214,15 @@ start_django() {
     }
 }
 
-# Create MinIO bucket using Python
-create_bucket_python() {
+
+initialize_minio() {
+    log_info "Initializing MinIO using Python SDK..."
+
     python -c "
 import boto3
 from botocore.client import Config
 import json
+import os
 
 try:
     s3 = boto3.client(
@@ -223,11 +230,15 @@ try:
         endpoint_url='http://localhost:$MINIO_API_PORT',
         aws_access_key_id='$MINIO_USER',
         aws_secret_access_key='$MINIO_PASSWORD',
-        config=Config(signature_version='s3v4'),
+        config=Config(
+            signature_version='s3v4',           
+            connect_timeout=5,
+            retries={'max_attempts': 3},
+            max_pool_connections=20
+        ),
         region_name='us-east-1'
     )
     
-    # Try to list buckets
     buckets = s3.list_buckets()
     bucket_exists = False
     
@@ -241,7 +252,6 @@ try:
         s3.create_bucket(Bucket='$MINIO_BUCKET')
         print(f\"Created bucket: '$MINIO_BUCKET'\")
         
-        # Set bucket policy to public-read
         policy = {
             'Version': '2012-10-17',
             'Statement': [{
@@ -257,11 +267,40 @@ try:
             Policy=json.dumps(policy)
         )
         print(f\"Set '$MINIO_BUCKET' to public-read access\")
+    
+    try:
+        s3.put_object(
+            Bucket='$MINIO_BUCKET',
+            Key='avatars/',
+            Body=''
+        )
+        print(f\"Created directory: '$MINIO_BUCKET/avatars/'\")
+    except Exception as e:
+        print(f\"Warning: Could not create directory '$MINIO_BUCKET/avatars/': {str(e)}\")
+    
+    avatar_path = '$AVATAR_PATH'
+    if os.path.exists(avatar_path):
+        try:
+            s3.head_object(Bucket='$MINIO_BUCKET', Key='avatars/defaults.png')
+            print(f\"Avatar already exists at '$MINIO_BUCKET/$AVATAR_DEST', skipping upload\")
+        except ClientError:
+            with open('$AVATAR_PATH', 'rb') as file:
+                file_content = file.read()
+                s3.put_object(
+                    Bucket='$MINIO_BUCKET',
+                    Key='avatars/defaults.png',
+                    Body=file_content,
+                    ContentType='image/png'
+                )
+            print(f\"Uploaded default avatar to '$MINIO_BUCKET/$AVATAR_DEST'\")
+    
+    print(\"\\nMinIO initialization completed successfully!\")
+    
 except Exception as e:
-    print(f\"Error: {str(e)}\")
+    print(f\"\\nError during MinIO initialization: {str(e)}\")
     exit(1)
 " || {
-        log_error "Failed to create MinIO bucket"
+        log_error "Failed to initialize MinIO"
         return 1
     }
 }
@@ -385,7 +424,7 @@ show_help() {
     echo "  redis      Start only Redis service"
     echo "  minio      Start only MinIO service"
     echo "  dfdetect   Start only DeepFake Detection service"
-    echo "  celery     Start only Celery worker"          
+    echo "  celery     Start only Celery worker"
     echo "  django     Start only Django server"
     echo "  stop       Stop all services"
     echo "  status     Check status of all services"
@@ -443,7 +482,7 @@ main() {
             log_info "Stopping temporary MinIO service..."
             docker stop $MINIO_NAME >/dev/null
         else
-            create_bucket_python
+            initialize_minio
         fi
         ;;
     clean)

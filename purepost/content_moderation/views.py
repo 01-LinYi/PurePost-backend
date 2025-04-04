@@ -12,7 +12,6 @@ from .serializers import (
 )
 from .permissions import IsOwnerOrReadOnly
 
-
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from .serializers import UserSerializer, PostSerializer
@@ -21,7 +20,6 @@ User = get_user_model()
 
 
 class ProfilePostPagination(PageNumberPagination):
-
     page_size = 10
     page_size_query_param = 'page_size'
     max_page_size = 50
@@ -73,6 +71,7 @@ class PostViewSet(viewsets.ModelViewSet):
             return PostCreateSerializer
         return PostSerializer
 
+    # Param options are: user_id: unknown, is_pinned: boolean.
     def get_queryset(self):
         """Filter queryset based on request parameters"""
         queryset = Post.objects.all()
@@ -94,12 +93,27 @@ class PostViewSet(viewsets.ModelViewSet):
             # Get posts of the specified user
             queryset = queryset.filter(user_id=user_id)
 
+        # Filter by pin status, default to all
+        is_pinned = self.request.query_params.get('is_pinned')
+        if is_pinned:
+            pinned = None
+            if is_pinned == 'true' or is_pinned == 'True':
+                pinned = True
+            elif is_pinned == 'false' or is_pinned == 'False':
+                pinned = False
+            else:
+                return Response(
+                    {"detail": "Invalid value for is_pinned parameter"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            queryset = queryset.filter(pinned=pinned)
+
         return queryset
 
     def perform_create(self, serializer):
         """Set current user as author when creating a post"""
         serializer.save(user=self.request.user)
-    
+
     def perform_update(self, serializer):
         """Update post and handle disclaimer"""
         serializer.save()
@@ -111,16 +125,15 @@ class PostViewSet(viewsets.ModelViewSet):
 
         # Check if already liked (assuming Like model exists, adjust as needed)
         # Comment this section if Like model is not yet implemented
-        
+
         if post.likes.filter(user=request.user).exists():
             return Response(
                 {"detail": "You have already liked this post"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Create like record
         post.likes.create(user=request.user)
-        
 
         # Update like count
         post.like_count += 1
@@ -148,7 +161,6 @@ class PostViewSet(viewsets.ModelViewSet):
             post.save()
 
         return Response({"detail": "Post unliked successfully"}, status=status.HTTP_200_OK)
-    
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def comment(self, request, pk=None):
@@ -161,7 +173,6 @@ class PostViewSet(viewsets.ModelViewSet):
             post.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
     @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAuthenticated])
     def delete_comment(self, request, pk=None):
@@ -208,14 +219,14 @@ class PostViewSet(viewsets.ModelViewSet):
             post.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=True, methods=['patch'])
     def update_visibility(self, request, pk=None):
         """Allows users to update post visibility."""
         post = self.get_object()
         if post.user != request.user:
             return Response({'error': 'Unauthorized'}, status=403)
-        
+
         new_visibility = request.data.get('visibility')
         if new_visibility not in ['public', 'private', 'friends']:
             return Response({'error': 'Invalid visibility option'}, status=400)
@@ -223,6 +234,26 @@ class PostViewSet(viewsets.ModelViewSet):
         post.visibility = new_visibility
         post.save()
         return Response({'message': 'Visibility updated', 'visibility': post.visibility})
+
+    @action(detail=True, methods=['post'])
+    def pin(self, request, pk=None):
+        post = Post.objects.get(pk=pk)
+        if post.user != request.user:
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        post.pinned = True
+        post.save()
+        return Response({'message': 'Post pinned'})
+
+    @action(detail=True, methods=['post'])
+    def unpin(self, request, pk=None):
+        post = Post.objects.get(pk=pk)
+        if post.user != request.user:
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        post.pinned = False
+        post.save()
+        return Response({'message': 'Post unpinned'})
 
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -320,7 +351,7 @@ class SavedPostViewSet(viewsets.ModelViewSet):
                 saved_post, context={'request': request})
             return Response(
                 {"detail": "Post saved successfully",
-                    "saved_post": serializer.data},
+                 "saved_post": serializer.data},
                 status=status.HTTP_201_CREATED
             )
 
@@ -329,7 +360,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
     """ViewSet for retrieving post interactions (likes, shares, comments)."""
 
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def list_likes(self, request, post_id=None):
         """Retrieve the list of users who liked a post"""
         post = get_object_or_404(Post, id=post_id)
