@@ -17,6 +17,12 @@ class Post(models.Model):
         ('analysis_failed', 'Analysis Failed')
     )
 
+
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    )
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="posts")
     content = models.TextField(blank=True, null=True)
     image = models.ImageField(upload_to="posts/images/", blank=True, null=True)
@@ -40,6 +46,7 @@ class Post(models.Model):
         blank=True,
         help_text="Confidence score for deepfake detection"
     )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='published')
 
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
@@ -54,13 +61,15 @@ class Post(models.Model):
 
     def __str__(self):
         """String representation"""
+        status_text = f" ({self.get_status_display()})" if self.status != 'published' else ""
         return f"Post by {self.user.username} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
     def save(self, *args, **kwargs):
         """Override save method to handle image/video mutual exclusivity"""
-        # Ensure at least content, image, or video is present
-        if not (self.content or self.image or self.video):
-            raise ValueError("Post must have at least content, image, or video")
+        # Ensure at least content, image, or video is present for non-draft
+        if self.status != 'draft':
+            if not (self.content or self.image or self.video):
+                raise ValueError("Post must have at least content, image, or video")
 
         super().save(*args, **kwargs)
 

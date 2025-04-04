@@ -80,7 +80,8 @@ class PostSerializer(serializers.ModelSerializer):
             'id', 'user', 'content', 'image', 'video',
             'visibility', 'like_count', 'share_count', 'comment_count',
             'created_at', 'updated_at',
-            'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned'
+            'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
+            'status'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
@@ -118,10 +119,10 @@ class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'content', 'image',
-                  'video', 'visibility', 'disclaimer']
+                  'video', 'visibility', 'disclaimer','status']
 
     def validate(self, data):
-        if not (data.get('content') or data.get('image') or data.get('video')):
+        if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
         return data

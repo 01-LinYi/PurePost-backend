@@ -76,14 +76,14 @@ class PostViewSet(viewsets.ModelViewSet):
         """Filter queryset based on request parameters"""
         queryset = Post.objects.all()
 
-        # Filter by visibility - only owner can see their private posts
+        # Filter by visibility - only owner can see their private posts and drafts
         if self.request.user.is_authenticated:
             queryset = queryset.filter(
-                Q(visibility='public') |
-                Q(visibility='private', user=self.request.user)
+                Q(visibility='public', status='published') |
+                Q(user=self.request.user)
             )
         else:
-            queryset = queryset.filter(visibility='public')
+            queryset = queryset.filter(visibility='public', status='published')
 
         # Filter by user ID
         user_id = self.request.query_params.get('user_id')
@@ -254,6 +254,72 @@ class PostViewSet(viewsets.ModelViewSet):
         post.pinned = False
         post.save()
         return Response({'message': 'Post unpinned'})
+
+    @action(detail=False, methods=['get'], url_path='draft')
+    def get_draft(self, request):
+        """Get the user's draft post (assuming only one draft per user)"""
+        draft = Post.objects.filter(user=request.user, status='draft').first()
+        if not draft:
+            return Response({"detail": "No draft found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = self.get_serializer(draft)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='save-draft')
+    def save_draft(self, request):
+        """Save or update the user's draft post"""
+        # Check if user already has a draft
+        existing_draft = Post.objects.filter(user=request.user, status='draft').first()
+        
+        if existing_draft:
+            # Update existing draft
+            serializer = self.get_serializer(existing_draft, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save(status='draft')
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Create new draft
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(user=request.user, status='draft')
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='publish')
+    def publish_draft(self, request, pk=None):
+        """Publish a draft post"""
+        post = self.get_object()
+        
+        # Only the owner can publish their draft
+        if post.user != request.user:
+            return Response(
+                {"detail": "You do not have permission to publish this draft"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Ensure it's a draft
+        if post.status != 'draft':
+            return Response(
+                {"detail": "Only draft posts can be published"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate that the post has required content
+        if not (post.content or post.image or post.video):
+            return Response(
+                {"detail": "Post must have at least content, image, or video to be published"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Update to published status
+        post.status = 'published'
+        post.save()
+        
+        # Return the updated post
+        serializer = self.get_serializer(post)
+        return Response(serializer.data)
+
 
 
 class FolderViewSet(viewsets.ModelViewSet):
