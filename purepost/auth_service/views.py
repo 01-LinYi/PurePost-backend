@@ -48,6 +48,7 @@ class LoginView(APIView):
                         "username": user.username,
                         "email": user.email,
                         "is_verified": user.is_verified,
+                        "is_private": user.is_private,
                     },
                 },
                 status=status.HTTP_200_OK
@@ -81,6 +82,7 @@ class DeleteAccountView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class FollowingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -99,6 +101,7 @@ class FollowersView(APIView):
         followers = request.user.followers.all()
         serializer = UserSerializer(followers, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class FollowUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -126,11 +129,34 @@ class UnfollowUserView(APIView):
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+class UserVisibilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    # noinspection PyMethodMayBeStatic
+    def update(self, request):
+        """Update user visibility."""
+
+        # Convert string to boolean
+        is_private = request.data.get('isPrivate')
+        if is_private is None:
+            return Response({"error": "isPrivate is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.is_private = is_private
+        request.user.save()
+        return Response({"message": "Visibility updated"}, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        return self.update(request)
+
+    def patch(self, request):
+        return self.update(request)
+
+
 class EmailVerificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     @staticmethod
-    def post(request):
+    def get(request):
         user = request.user
         if user.is_verified:
             return Response(
@@ -165,7 +191,7 @@ class EmailVerificationView(APIView):
         )
 
     @staticmethod
-    def get(request):
+    def post(request):
         user = request.user
         if user.is_verified:
             return Response(
@@ -174,7 +200,7 @@ class EmailVerificationView(APIView):
             )
 
         # Get the code from query params
-        verification_code = request.query_params.get("code")
+        verification_code = request.data.get("code")
 
         # Retrieve the verification code from Redis
         redis_key = f"email_verification:{user.id}"

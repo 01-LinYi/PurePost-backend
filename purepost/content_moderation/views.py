@@ -427,23 +427,23 @@ class PostInteractionViewSet(viewsets.ViewSet):
 
     permission_classes = [permissions.IsAuthenticated]
 
-    def list_likes(self, request, post_id=None):
+    def list_likes(self, request, pk=None):
         """Retrieve the list of users who liked a post"""
-        post = get_object_or_404(Post, id=post_id)
-        users = User.objects.filter(like__post=post).distinct()
+        post = get_object_or_404(Post, id=pk)
+        users = User.objects.filter(likes__post=post).distinct()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
-    def list_shares(self, request, post_id=None):
+    def list_shares(self, request, pk=None):
         """Retrieve the list of users who shared a post."""
-        post = get_object_or_404(Post, id=post_id)
+        post = get_object_or_404(Post, id=pk)
         users = User.objects.filter(share__post=post).distinct()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
-    def list_comments(self, request, post_id=None):
+    def list_comments(self, request, pk=None):
         """Retrieve the list of comments for a post"""
-        post = get_object_or_404(Post, id=post_id)
+        post = get_object_or_404(Post, id=pk)
         comments = post.comments.filter(parent=None)
         serializer = CommentSerializer(comments, many=True)
         return Response(serializer.data)

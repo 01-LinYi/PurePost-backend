@@ -108,6 +108,8 @@ services:
       minio:
         condition: service_healthy
     restart: on-failure
+    volumes:
+      - ./purepost/media/avatars/defaults.png:/tmp/default-avatar.png
     entrypoint: >
       /bin/sh -c "
       sleep 3;
@@ -118,8 +120,15 @@ services:
 
       /usr/bin/mc anonymous set download myminio/purepost-media;
 
+      /usr/bin/mc mb myminio/purepost-media/avatars || true;
+
+      /usr/bin/mc cp /tmp/default-avatar.png myminio/purepost-media/avatars/defaults.png;
+
+      /usr/bin/mc anonymous set download myminio/purepost-media/avatars/defaults.png;
+
       echo 'MinIO initialization completed successfully!';
       echo 'Created bucket: purepost-media';
+      echo 'Uploaded default avatar to: purepost-media/avatars/default-avatar.png';
       "
 
 volumes:
