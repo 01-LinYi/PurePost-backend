@@ -48,6 +48,7 @@ class LoginView(APIView):
                         "username": user.username,
                         "email": user.email,
                         "is_verified": user.is_verified,
+                        "is_private": user.is_private,
                     },
                 },
                 status=status.HTTP_200_OK
@@ -81,6 +82,7 @@ class DeleteAccountView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class FollowingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -99,6 +101,7 @@ class FollowersView(APIView):
         followers = request.user.followers.all()
         serializer = UserSerializer(followers, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class FollowUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -124,6 +127,35 @@ class UnfollowUserView(APIView):
             return Response({"message": "Unfollowed successfully"}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+class UserVisibilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    # noinspection PyMethodMayBeStatic
+    def update(self, request):
+        """Update user visibility."""
+
+        # Convert string to boolean
+        is_private = None
+        req_is_private = request.data.get('isPrivate')
+        if req_is_private == "True" or req_is_private == "true":
+            is_private = True
+        elif req_is_private == "False" or req_is_private == "false":
+            is_private = False
+
+        if is_private is None:
+            return Response({"error": "Invalid isPrivate value"}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.is_private = is_private
+        request.user.save()
+        return Response({"message": "Visibility updated"}, status=status.HTTP_200_OK)
+
+    def put(self, request):
+        return self.update(request)
+
+    def patch(self, request):
+        return self.update(request)
 
 
 class EmailVerificationView(APIView):

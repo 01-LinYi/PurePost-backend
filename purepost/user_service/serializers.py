@@ -10,16 +10,21 @@ class ProfileSerializer(serializers.ModelSerializer):
     """
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
-    is_active = serializers.BooleanField(
-        source="user.is_active", read_only=True)
+    is_active = serializers.BooleanField(source="user.is_active", read_only=True)
+    is_private = serializers.BooleanField(source="user.is_private", read_only=True)
     is_followed = serializers.SerializerMethodField()  # whether the current user follows the returning profile
 
     class Meta:
         model = Profile
         fields = [
+            # Auth User fields
             "user_id",
-            "username",  # Profile has a foreign key to the User model
-            "email",  # Profile has a foreign key to the User model
+            "username",
+            "email",
+            "is_active",
+            "is_private",
+
+            # Profile fields
             "avatar",
             "bio",
             "location",
@@ -27,12 +32,14 @@ class ProfileSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "created_at",
             "updated_at",
-            "is_active",  # Profile has a foreign key to the User model
             "is_followed",
         ]
-        # These fields cannot be modified
-        read_only_fields = ["username", "email",
-                            "is_active", "created_at", "updated_at"]
+        # These fields can't be modified
+        read_only_fields = [
+            "username", "email",
+            "is_active", "is_private",
+            "created_at", "updated_at"
+        ]
 
     def validate_bio(self, value: str) -> str:
         """
@@ -65,11 +72,41 @@ class ProfileSerializer(serializers.ModelSerializer):
                 "The date of birth cannot be in the future.")
         return value
 
-    def get_is_followed(self, obj):
+    def get_is_followed(self, obj) -> bool:
         """
         Custom method to check if the currently logged-in user follows the profile user.
         """
         request = self.context.get('request')  # Access the request from the serializer context
         if request and request.user.is_authenticated:  # Ensure the user is logged in
             return Follow.objects.filter(follower=request.user, following=obj.user).exists()
-        return False  # If the user is not logged in, return False as the default
+        return False  # If the user isn't logged in, return False as the default
+
+    def to_representation(self, instance):
+        """
+        Override to conditionally hide fields based on privacy settings.
+        If the profile is private and the user isn't followed, hide certain fields.
+        """
+        # Get the base representation
+        ret = super().to_representation(instance)
+
+        # Define fields to hide for private profiles when not followed
+        private_hidden_fields = [
+            "bio",
+            "location",
+            "website",
+            "date_of_birth",
+        ]
+
+        # Check if the profile is private and the user isn't followed
+        if ret.get('is_private') and not ret.get('is_followed'):
+            # The current user isn't the profile owner and doesn't follow them
+            request = self.context.get('request')
+
+            # If it's not the user's own profile, hide the fields
+            if not (request and request.user.is_authenticated and request.user.id == instance.user_id):
+                # Remove the private fields from the response
+                for field in private_hidden_fields:
+                    if field in ret:
+                        ret.pop(field)
+
+        return ret
