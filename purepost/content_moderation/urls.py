@@ -19,4 +19,7 @@ urlpatterns = [
     path('posts/<int:pk>/interactions/likes/', PostInteractionViewSet.as_view({'get': 'list_likes'}), name='post-likes'),
     path('posts/<int:pk>/interactions/shares/', PostInteractionViewSet.as_view({'get': 'list_shares'}), name='post-shares'),
     path('posts/<int:pk>/interactions/comments/', PostInteractionViewSet.as_view({'get': 'list_comments'}), name='post-comments'),
+    path('posts/draft/', PostViewSet.as_view({'get': 'get_draft'}), name='post-get-draft'),
+    path('posts/save-draft/', PostViewSet.as_view({'post': 'save_draft'}), name='post-save-draft'),
+    path('posts/<int:pk>/publish/', PostViewSet.as_view({'post': 'publish_draft'}), name='post-publish-draft'),
 ]
