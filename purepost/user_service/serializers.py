@@ -12,6 +12,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source="user.email", read_only=True)
     is_active = serializers.BooleanField(source="user.is_active", read_only=True)
     is_private = serializers.BooleanField(source="user.is_private", read_only=True)
+    is_verified = serializers.BooleanField(source="user.is_verified", read_only=True)
     is_followed = serializers.SerializerMethodField()  # whether the current user follows the returning profile
 
     class Meta:
@@ -22,6 +23,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             "username",
             "email",
             "is_active",
+            "is_verified",
             "is_private",
 
             # Profile fields
@@ -78,7 +80,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         """
         request = self.context.get('request')  # Access the request from the serializer context
         if request and request.user.is_authenticated:  # Ensure the user is logged in
-            return Follow.objects.filter(follower=request.user, following=obj.user).exists()
+            return Follow.objects.filter(follower=request.user, following=obj.user, is_active=True).exists()
         return False  # If the user isn't logged in, return False as the default
 
     def to_representation(self, instance):
