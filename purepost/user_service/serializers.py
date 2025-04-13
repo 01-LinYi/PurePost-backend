@@ -8,6 +8,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     Serializer for the Profile model.
     Serializes all fields of the Profile model and provides validation for updating user profiles.
     """
+    id = serializers.IntegerField(source="user.id", read_only=True)
     username = serializers.CharField(source="user.username", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
     is_active = serializers.BooleanField(source="user.is_active", read_only=True)
@@ -19,7 +20,7 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = [
             # Auth User fields
-            "user_id",
+            "id",
             "username",
             "email",
             "is_active",
