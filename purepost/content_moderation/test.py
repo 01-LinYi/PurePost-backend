@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
-from .models import Post, Folder, SavedPost, Comment, Like, Share
+from .models import Post, Folder, SavedPost, Comment, Like, Share, Tag
 import tempfile
 from PIL import Image
 import json
@@ -741,3 +741,224 @@ class PostInteractionViewSetTests(APITestCase):
         self.assertEqual(len(response_likes.data), 0)
         self.assertEqual(len(response_shares.data), 0)
         self.assertEqual(len(response_comments.data), 0)
+
+
+
+class PostCaptionAndTagsTestCase(APITestCase):
+    """Test cases for post captions and tags functionality"""
+
+    def setUp(self):
+        """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+        self.existing_tag = Tag.objects.create(name='existingtag')
+
+        self.valid_post_data = {
+            'content': 'Test post content',
+            'caption': 'This is a test caption',
+            'tags': ['testtag1', 'testtag2', 'existingtag'],
+            'visibility': 'public'
+        }
+
+    def test_create_post_with_caption_and_tags(self):
+        """Test creating a post with caption and tags"""
+        response = self.client.post(
+            reverse('posts-list'),
+            data=self.valid_post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Check caption was saved
+        self.assertEqual(response.data['caption'], 'This is a test caption')
+        
+        # Check tags were saved and properly serialized
+        self.assertEqual(len(response.data['tags']), 3)
+        tag_names = [tag['name'] for tag in response.data['tags']]
+        self.assertIn('testtag1', tag_names)
+        self.assertIn('testtag2', tag_names)
+        self.assertIn('existingtag', tag_names)
+
+    def test_create_post_with_long_caption(self):
+        """Test caption length validation"""
+        long_caption = 'x' * 301  # Exceeds 300 character limit
+        post_data = {
+            'content': 'Test content',
+            'caption': long_caption,
+            'visibility': 'public'
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('caption', response.data)
+        self.assertEqual(
+            response.data['caption'][0],
+            "Caption cannot exceed 300 characters"
+        )
+
+    def test_create_post_with_too_many_tags(self):
+        """Test tag count validation"""
+        post_data = {
+            'content': 'Test content',
+            'tags': [f'tag{i}' for i in range(11)],  # 11 tags (limit is 10)
+            'visibility': 'public'
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('tags', response.data)
+        self.assertEqual(
+            response.data['tags'][0],
+            "Cannot add more than 10 tags to a post"
+        )
+
+    def test_view_post_with_caption_and_tags(self):
+        """Test viewing a post with caption and tags"""
+
+        create_response = self.client.post(
+            reverse('posts-list'),
+            data=self.valid_post_data,
+            format='json'
+        )
+        post_id = create_response.data['id']
+
+        retrieve_response = self.client.get(
+            reverse('posts-detail', kwargs={'pk': post_id})
+        )
+        self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
+        
+        # Verify caption and tags are displayed
+        self.assertEqual(
+            retrieve_response.data['caption'],
+            'This is a test caption'
+        )
+        self.assertEqual(len(retrieve_response.data['tags']), 3)
+
+    def test_update_post_caption_and_tags(self):
+        """Test updating a post's caption and tags"""
+
+        create_response = self.client.post(
+            reverse('posts-list'),
+            data=self.valid_post_data,
+            format='json'
+        )
+        post_id = create_response.data['id']
+
+        update_data = {
+            'caption': 'Updated caption',
+            'tags': ['updatedtag1', 'updatedtag2']
+        }
+        update_response = self.client.patch(
+            reverse('posts-detail', kwargs={'pk': post_id}),
+            data=update_data,
+            format='json'
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        
+        # Verify the updates
+        self.assertEqual(update_response.data['caption'], 'Updated caption')
+        tag_names = [tag['name'] for tag in update_response.data['tags']]
+        self.assertEqual(len(tag_names), 2)
+        self.assertIn('updatedtag1', tag_names)
+        self.assertIn('updatedtag2', tag_names)
+
+    def test_remove_caption_and_tags(self):
+        """Test removing caption and tags from a post"""
+
+        create_response = self.client.post(
+            reverse('posts-list'),
+            data=self.valid_post_data,
+            format='json'
+        )
+        post_id = create_response.data['id']
+
+        # Remove caption and tags
+        update_data = {
+            'caption': '',
+            'tags': []
+        }
+        update_response = self.client.patch(
+            reverse('posts-detail', kwargs={'pk': post_id}),
+            data=update_data,
+            format='json'
+        )
+        self.assertEqual(update_response.status_code, status.HTTP_200_OK)
+        
+        # Verify the removal
+        self.assertEqual(update_response.data['caption'], '')
+        self.assertEqual(len(update_response.data['tags']), 0)
+
+    def test_create_post_with_duplicate_tags(self):
+        """Test that duplicate tags are handled properly"""
+        post_data = {
+            'content': 'Test content',
+            'tags': ['duptag', 'duptag', 'DUPTAG'],  # Different case duplicates
+            'visibility': 'public'
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # Should only create one tag instance
+        self.assertEqual(len(response.data['tags']), 1)
+        self.assertEqual(response.data['tags'][0]['name'], 'duptag')
+
+    def test_create_post_with_invalid_tag_characters(self):
+        """Test that invalid tag characters are rejected"""
+        post_data = {
+            'content': 'Test content',
+            'tags': ['valid', 'invalid!tag', 'another@tag'],
+            'visibility': 'public'
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('tags', response.data)
+
+    def test_search_posts_by_tag(self):
+        """Test searching posts by tag"""
+        # Create posts with different tags
+        self.client.post(
+            reverse('posts-list'),
+            data={
+                'content': 'Post with tag1',
+                'tags': ['tag1'],
+                'visibility': 'public'
+            },
+            format='json'
+        )
+        self.client.post(
+            reverse('posts-list'),
+            data={
+                'content': 'Post with tag2',
+                'tags': ['tag2'],
+                'visibility': 'public'
+            },
+            format='json'
+        )
+
+        # Search by tag1
+        response = self.client.get(
+            reverse('post-by-tag') + '?name=tag1'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['content'], 'Post with tag1')
