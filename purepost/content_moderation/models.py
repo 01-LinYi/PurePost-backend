@@ -35,6 +35,8 @@ class Post(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     pinned = models.BooleanField(default=False)
     disclaimer = models.CharField(max_length=200, blank=True, null=True)
+    caption = models.CharField(max_length=300, blank=True, null=True)
+    tags = models.ManyToManyField('Tag', related_name='posts', blank=True)
     deepfake_status = models.CharField(
         max_length=20,
         choices=DEEPFAKE_CHOICES,
@@ -191,3 +193,17 @@ class Comment(models.Model):
 
         # Call the superclass delete method to actually delete the comment
         super().delete(*args, **kwargs)
+
+
+class Tag(models.Model):
+    """Tag model - Users can search through tags"""
+    name = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        db_table = 'content_moderation_tag'
+        verbose_name = 'Tag'
+        verbose_name_plural = 'Tags'
+        ordering = ['name']
+
+    def __str__(self):
+        return f"#{self.name}"

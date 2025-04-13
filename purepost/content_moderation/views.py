@@ -319,7 +319,17 @@ class PostViewSet(viewsets.ModelViewSet):
         # Return the updated post
         serializer = self.get_serializer(post)
         return Response(serializer.data)
-
+    
+    @action(detail=False, methods=['get'], url_path='by-tag')
+    def by_tag(self, request):
+        """Search posts by tag"""
+        tag_name = request.query_params.get('name')
+        if not tag_name:
+            return Response({'error': 'Tag name is required'}, status=status.HTTP_400_BAD_REQUEST)
+        posts = Post.objects.filter(tags__name__iexact=tag_name,status='published').order_by('-created_at')
+        page = self.paginate_queryset(posts)
+        serializer = self.get_serializer(page, many=True)
+        return Response(serializer.data)
 
 
 class FolderViewSet(viewsets.ModelViewSet):
