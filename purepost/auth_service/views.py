@@ -49,6 +49,7 @@ class LoginView(APIView):
                         "email": user.email,
                         "is_verified": user.is_verified,
                         "is_private": user.is_private,
+                        "is_admin": user.is_admin,
                     },
                 },
                 status=status.HTTP_200_OK
@@ -82,7 +83,7 @@ class DeleteAccountView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+'''
 class FollowingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -127,7 +128,7 @@ class UnfollowUserView(APIView):
             return Response({"message": "Unfollowed successfully"}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
+'''
 
 class UserVisibilityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -319,3 +320,13 @@ class ForgetPasswordView(APIView):
             {"message": "Password updated successfully."},
             status=status.HTTP_200_OK
         )
+
+class CheckAdminView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        return Response({
+            'is_admin': request.user.is_admin,
+            'is_superuser': request.user.is_superuser
+        })
+    
