@@ -105,18 +105,20 @@ start_minio() {
     log_info "Starting MinIO service..."
     mkdir -p $TEMP_DIR/minio-data
 
-    docker run --rm -d \
+    (docker run --rm -d \
         --name $MINIO_NAME \
         -v $TEMP_DIR/minio-data:/data \
         -p $MINIO_API_PORT:9000 \
         -p $MINIO_CONSOLE_PORT:9001 \
         -e MINIO_ROOT_USER=$MINIO_USER \
         -e MINIO_ROOT_PASSWORD=$MINIO_PASSWORD \
-        minio/minio server /data --console-address ":9001" >/dev/null || {
+        -e "MINIO_BROWSER_REDIRECT_URL=http://localhost:9001" \
+        -e "MINIO_CORS_ALLOW_ORIGIN=*" \
+        minio/minio server /data --address "0.0.0.0:9000" \
+        --console-address "0.0.0.0:9001" >/dev/null) || {
         log_error "Failed to start MinIO"
         return 1
     }
-
     log_success "MinIO service started successfully!"
     log_info "- API Port: $MINIO_API_PORT"
     log_info "- Console Port: $MINIO_CONSOLE_PORT"
@@ -223,13 +225,14 @@ import boto3
 from botocore.client import Config
 import json
 import os
+from botocore.exceptions import ClientError
 
 try:
     s3 = boto3.client(
         's3',
-        endpoint_url='http://localhost:$MINIO_API_PORT',
-        aws_access_key_id='$MINIO_USER',
-        aws_secret_access_key='$MINIO_PASSWORD',
+        endpoint_url='http://localhost:${MINIO_API_PORT}',  # 使用花括号包裹变量名
+        aws_access_key_id='${MINIO_USER}',
+        aws_secret_access_key='${MINIO_PASSWORD}',
         config=Config(
             signature_version='s3v4',           
             connect_timeout=5,
@@ -243,56 +246,56 @@ try:
     bucket_exists = False
     
     for bucket in buckets['Buckets']:
-        if bucket['Name'] == '$MINIO_BUCKET':
+        if bucket['Name'] == '${MINIO_BUCKET}': 
             bucket_exists = True
-            print(f\"Bucket '$MINIO_BUCKET' already exists\")
+            print(f\"Bucket '${MINIO_BUCKET}' already exists\")
             break
     
     if not bucket_exists:
-        s3.create_bucket(Bucket='$MINIO_BUCKET')
-        print(f\"Created bucket: '$MINIO_BUCKET'\")
+        s3.create_bucket(Bucket='${MINIO_BUCKET}') 
+        print(f\"Created bucket: '${MINIO_BUCKET}'\")
         
         policy = {
             'Version': '2012-10-17',
             'Statement': [{
                 'Sid': 'PublicReadGetObject',
                 'Effect': 'Allow',
-                'Principal': '*',
+                'Principal': {'AWS': ['*']}, 
                 'Action': ['s3:GetObject'],
-                'Resource': [f'arn:aws:s3:::$MINIO_BUCKET/*']
+                'Resource': ['arn:aws:s3:::${MINIO_BUCKET}/*']
             }]
         }
         s3.put_bucket_policy(
-            Bucket='$MINIO_BUCKET',
+            Bucket='${MINIO_BUCKET}',
             Policy=json.dumps(policy)
         )
-        print(f\"Set '$MINIO_BUCKET' to public-read access\")
+        print(f\"Set '${MINIO_BUCKET}' to public-read access\")
     
     try:
         s3.put_object(
-            Bucket='$MINIO_BUCKET',
+            Bucket='${MINIO_BUCKET}', 
             Key='avatars/',
             Body=''
         )
-        print(f\"Created directory: '$MINIO_BUCKET/avatars/'\")
+        print(f\"Created directory: '${MINIO_BUCKET}/avatars/'\")
     except Exception as e:
-        print(f\"Warning: Could not create directory '$MINIO_BUCKET/avatars/': {str(e)}\")
+        print(f\"Warning: Could not create directory '${MINIO_BUCKET}/avatars/': {str(e)}\")
     
-    avatar_path = '$AVATAR_PATH'
+    avatar_path = '${AVATAR_PATH}'
     if os.path.exists(avatar_path):
         try:
-            s3.head_object(Bucket='$MINIO_BUCKET', Key='avatars/defaults.png')
-            print(f\"Avatar already exists at '$MINIO_BUCKET/$AVATAR_DEST', skipping upload\")
+            s3.head_object(Bucket='${MINIO_BUCKET}', Key='avatars/defaults.png')  # 使用花括号包裹变量名
+            print(f\"Avatar already exists at '${MINIO_BUCKET}/${AVATAR_DEST}', skipping upload\")  # 使用花括号包裹变量名
         except ClientError:
-            with open('$AVATAR_PATH', 'rb') as file:
+            with open('${AVATAR_PATH}', 'rb') as file:  
                 file_content = file.read()
                 s3.put_object(
-                    Bucket='$MINIO_BUCKET',
+                    Bucket='${MINIO_BUCKET}',  
                     Key='avatars/defaults.png',
                     Body=file_content,
                     ContentType='image/png'
                 )
-            print(f\"Uploaded default avatar to '$MINIO_BUCKET/$AVATAR_DEST'\")
+            print(f\"Uploaded default avatar to '${MINIO_BUCKET}/${AVATAR_DEST}'\")  # 使用花括号包裹变量名
     
     print(\"\\nMinIO initialization completed successfully!\")
     
