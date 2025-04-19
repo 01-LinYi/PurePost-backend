@@ -81,11 +81,11 @@ class PostSerializer(serializers.ModelSerializer):
             'visibility', 'like_count', 'share_count', 'comment_count',
             'created_at', 'updated_at',
             'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
-            'status'
+            'status', 'caption', 'tags'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
-            'created_at', 'updated_at', 'is_liked', 'is_saved', 'disclaimer'
+            'created_at', 'updated_at', 'is_liked', 'is_saved'
         ]
 
     def get_is_liked(self, obj):
@@ -119,12 +119,33 @@ class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'content', 'image',
-                  'video', 'visibility', 'disclaimer','status']
+                  'video', 'visibility', 'disclaimer','status',
+                  'caption', 'tags']
 
     def validate(self, data):
         if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
+
+
+        # Validate tags (if provided)
+        tags = data.get('tags')
+        if tags:
+            # Ensure tags is a list
+            if not isinstance(tags, list):
+                raise serializers.ValidationError("Tags must be a list")
+            
+            # Validate each tag
+            for tag in tags:
+                if not isinstance(tag, str):
+                    raise serializers.ValidationError("Each tag must be a string")
+                if len(tag) > 30:
+                    raise serializers.ValidationError("Tags cannot exceed 30 characters")
+            
+            # Limit number of tags
+            if len(tags) > 10:
+                raise serializers.ValidationError("Maximum 10 tags allowed")
+
         return data
 
 
