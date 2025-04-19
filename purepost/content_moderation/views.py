@@ -1,22 +1,28 @@
+import logging
+from django.utils.translation import gettext_lazy as _
+from django.db.models import Count, Q
 from rest_framework import viewsets, status, permissions, filters, generics
+from rest_framework.serializers import ValidationError
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from .models import Post, Folder, SavedPost, Share, Comment
+from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
-    PostSerializer, PostCreateSerializer,
+    UserSerializer, PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    LikeSerializer, CommentSerializer, ShareSerializer
+    LikeSerializer, CommentSerializer, ShareSerializer, ReportSerializer,
+    ReportUpdateSerializer, ReportStatsSerializer,
 )
-from .permissions import IsOwnerOrReadOnly
+from .permissions import IsOwnerOrReadOnly, IsReporterOrAdmin
+from .throttling import ReportRateThrottle
 
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
-from .serializers import UserSerializer, PostSerializer
+from purepost.auth_service.permissions import IsAdminUser
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class ProfilePostPagination(PageNumberPagination):
@@ -43,10 +49,12 @@ class UserProfileView(generics.ListAPIView):
         # Retrieve visible posts
         posts = Post.objects.filter(user=user).order_by('-created_at')
         if user != request.user:
-            posts = posts.filter(visibility='public')  # Only show public posts for others
+            # Only show public posts for others
+            posts = posts.filter(visibility='public')
 
         page = self.paginate_queryset(posts)
-        post_serializer = PostSerializer(page, many=True, context={'request': request})
+        post_serializer = PostSerializer(
+            page, many=True, context={'request': request})
 
         return self.get_paginated_response({
             'profile': profile_serializer.data,
@@ -261,7 +269,7 @@ class PostViewSet(viewsets.ModelViewSet):
         draft = Post.objects.filter(user=request.user, status='draft').first()
         if not draft:
             return Response({"detail": "No draft found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         serializer = self.get_serializer(draft)
         return Response(serializer.data)
 
@@ -269,11 +277,13 @@ class PostViewSet(viewsets.ModelViewSet):
     def save_draft(self, request):
         """Save or update the user's draft post"""
         # Check if user already has a draft
-        existing_draft = Post.objects.filter(user=request.user, status='draft').first()
-        
+        existing_draft = Post.objects.filter(
+            user=request.user, status='draft').first()
+
         if existing_draft:
             # Update existing draft
-            serializer = self.get_serializer(existing_draft, data=request.data, partial=True)
+            serializer = self.get_serializer(
+                existing_draft, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save(status='draft')
                 return Response(serializer.data)
@@ -290,36 +300,35 @@ class PostViewSet(viewsets.ModelViewSet):
     def publish_draft(self, request, pk=None):
         """Publish a draft post"""
         post = self.get_object()
-        
+
         # Only the owner can publish their draft
         if post.user != request.user:
             return Response(
-                {"detail": "You do not have permission to publish this draft"}, 
+                {"detail": "You do not have permission to publish this draft"},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Ensure it's a draft
         if post.status != 'draft':
             return Response(
-                {"detail": "Only draft posts can be published"}, 
+                {"detail": "Only draft posts can be published"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Validate that the post has required content
         if not (post.content or post.image or post.video):
             return Response(
-                {"detail": "Post must have at least content, image, or video to be published"}, 
+                {"detail": "Post must have at least content, image, or video to be published"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         # Update to published status
         post.status = 'published'
         post.save()
-        
+
         # Return the updated post
         serializer = self.get_serializer(post)
         return Response(serializer.data)
-
 
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -447,3 +456,296 @@ class PostInteractionViewSet(viewsets.ViewSet):
         comments = post.comments.filter(parent=None)
         serializer = CommentSerializer(comments, many=True)
         return Response(serializer.data)
+
+
+class ReportViewSet(viewsets.ModelViewSet):
+    """
+    Report ViewSet - Handles CRUD operations for Report model.
+
+    Allows users to report posts for moderation.
+    Allows admins to view and manage reports.
+
+    Regular users can only:
+    - Create new reports
+    - View their own reports
+    - Delete their own reports (if still pending)
+
+    Admins can:
+    - View all reports
+    - Update report status
+    - Delete any report
+    - Access reporting statistics
+    """
+    queryset = Report.objects.all()
+    serializer_class = ReportSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['reason', 'additional_info', 'post__title']
+    ordering_fields = ['created_at', 'updated_at', 'status']
+    ordering = ['-created_at']
+    throttle_classes = [ReportRateThrottle]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_admin:
+            return Report.objects.all()
+        return Report.objects.filter(reporter=user)
+
+    def get_serializer_class(self):
+        if self.action == 'update' or self.action == 'partial_update':
+            return ReportUpdateSerializer
+        if self.action == 'stats':
+            return ReportStatsSerializer
+        return ReportSerializer
+
+    def get_permissions(self):
+        if self.action in ['update', 'partial_update']:
+            return [IsAdminUser()]
+        elif self.action == 'destroy':
+            return [IsReporterOrAdmin()]
+        elif self.action in ['stats', 'pending', 'resolve', 'reject', 'bulk_update']:
+            return [IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        """create a new report and send notification"""
+        try:
+            post_id = serializer.validated_data.get('post_id')
+            user = self.request.user
+
+            # check if the post exists
+            if Report.objects.filter(post_id=post_id, reporter=user).exists():
+                raise ValidationError(
+                    {"non_field_errors": [_("You have already reported this post")]})
+
+            # save
+            report = serializer.save(reporter=user)
+
+            '''
+            # send notification to the reporter
+            try:
+                from .tasks import send_report_notification
+                send_report_notification.delay(
+                    report.id,
+                    report.reporter.id,
+                    f"您已举报帖子 '{report.post.title[:30]}...' 的 {report.get_reason_display()}",
+                )
+
+                # If the report count exceeds a threshold, notify the admin
+                report_count = Report.objects.filter(post_id=post_id).count()
+                if report_count >= 5:  # Config here
+                    send_admin_alert.delay(
+                        post_id,
+                        f"Post '{report.post.title[:30]}...' has been reported {report_count} times.",
+                    )
+            except Exception as e:
+                logger.error(f"Failed to send report notification: {str(e)}")
+            '''
+
+        except Exception as e:
+            logger.error(f"Failed to create report: {str(e)}")
+            raise
+
+    def perform_update(self, serializer):
+        """Update report status and send notification"""
+        try:
+            old_status = serializer.instance.status
+            report = serializer.save(handled_by=self.request.user)
+            new_status = report.status
+
+            """if old_status != new_status:
+                try:
+                    from .tasks import send_report_notification
+                    send_report_notification.delay(
+                        report.id,
+                        report.reporter.id,
+                        f"Report Staus Update: {report.get_status_display()}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Failed to send status update notification: {str(e)}")
+            """
+
+        except Exception as e:
+            logger.error(f"Failed to update report: {str(e)}")
+            raise
+
+    def perform_destroy(self, instance):
+        """Check before deleting a report"""
+        try:
+            if not self.request.user.is_admin and instance.status != 'pending':
+                raise permissions.PermissionDenied(
+                    _("You cannot delete a report that has been processed")
+                )
+
+            logger.info(
+                f"Report {instance.id} deleted by {self.request.user.username}")
+            instance.delete()
+        except Exception as e:
+            logger.error(f"Failed to delete report: {str(e)}")
+            raise
+
+    @action(detail=False, methods=['get'])
+    def my_reports(self, request):
+        """get all reports submitted by the user"""
+        reports = Report.objects.filter(reporter=request.user)
+
+        # filter by status
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            reports = reports.filter(status=status_filter)
+
+        page = self.paginate_queryset(reports)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(reports, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def pending(self, request):
+        """Get all pending reports (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"detail": _("Only administrators can view pending reports")},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        reports = Report.objects.filter(status='pending')
+
+        # filter by reason
+        reason_filter = request.query_params.get('reason')
+        if reason_filter:
+            reports = reports.filter(reason=reason_filter)
+
+        page = self.paginate_queryset(reports)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(reports, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def resolve(self, request, pk=None):
+        """mark a report as resolved (admin only)"""
+        report = self.get_object()
+        old_status = report.status
+
+        if old_status == 'resolved':
+            return Response(
+                {"detail": _("This report is already resolved")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        report.status = 'resolved'
+        report.handled_by = request.user
+        report.save()
+
+        # Send notification to the reporter
+        """try:
+            from .tasks import send_report_notification
+            send_report_notification.delay(
+                report.id,
+                report.reporter.id,
+                f"Your report on post '{report.post.title[:30]}...' has been resolved.",
+            )
+        except Exception as e:
+            logger.error(f"Failed to send resolution notification: {str(e)}")"""
+
+        serializer = self.get_serializer(report)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Reject a report (admin only)"""
+        report = self.get_object()
+        old_status = report.status
+
+        if old_status == 'rejected':
+            return Response(
+                {"detail": _("This report is already rejected")},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        report.status = 'rejected'
+        report.handled_by = request.user
+        report.save()
+
+        """try:
+            from .tasks import send_report_notification
+            send_report_notification.delay(
+                report.id,
+                report.reporter.id,
+                f"Your report on post '{report.post.title[:30]}...' has been rejected. There is no violation found.",
+            )
+        except Exception as e:
+            logger.error(f"Failed to send rejection notification: {str(e)}")"""
+
+        serializer = self.get_serializer(report)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """get report statistics (admin only)"""
+        if not request.user.is_admin:
+            return Response(
+                {"detail": _("Only administrators can view report statistics")},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # basic statistics
+        total = Report.objects.count()
+        pending = Report.objects.filter(status='pending').count()
+        reviewing = Report.objects.filter(status='reviewing').count()
+        resolved = Report.objects.filter(status='resolved').count()
+        rejected = Report.objects.filter(status='rejected').count()
+
+        # by reason
+        reason_stats = (
+            Report.objects.values('reason')
+            .annotate(count=Count('id'))
+            .order_by('-count')
+        )
+
+        # last 7 days trend
+        from django.utils import timezone
+        from datetime import timedelta
+
+        today = timezone.now().date()
+        seven_days_ago = today - timedelta(days=6)
+
+        trend_data = []
+        for i in range(7):
+            day = seven_days_ago + timedelta(days=i)
+            next_day = day + timedelta(days=1)
+            count = Report.objects.filter(
+                created_at__gte=day,
+                created_at__lt=next_day
+            ).count()
+            trend_data.append({
+                'date': day.strftime('%Y-%m-%d'),
+                'count': count
+            })
+
+        # top 5 reported posts
+        top_reported_posts = (
+            Post.objects.annotate(report_count=Count('reports'))
+            .filter(report_count__gt=0)
+            .order_by('-report_count')[:5]
+            .values('id', 'title', 'report_count')
+        )
+
+        data = {
+            'total': total,
+            'by_status': {
+                'pending': pending,
+                'reviewing': reviewing,
+                'resolved': resolved,
+                'rejected': rejected
+            },
+            'by_reason': list(reason_stats),
+            'trend': trend_data,
+            'top_reported_posts': list(top_reported_posts)
+        }
+
+        return Response(data)
