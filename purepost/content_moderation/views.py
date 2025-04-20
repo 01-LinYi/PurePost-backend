@@ -11,7 +11,7 @@ from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
     UserSerializer, PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    LikeSerializer, CommentSerializer, ShareSerializer, ReportSerializer,
+    CommentSerializer, ShareSerializer, ReportSerializer,
     ReportUpdateSerializer, ReportStatsSerializer,
 )
 from .permissions import IsOwnerOrReadOnly, IsReporterOrAdmin

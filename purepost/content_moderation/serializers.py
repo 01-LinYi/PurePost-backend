@@ -61,8 +61,6 @@ class CommentSerializer(serializers.ModelSerializer):
         return CommentSerializer(obj.replies.all(), many=True).data
 
     def create(self, validated_data):
-        request = self.context.get('request')
-        validated_data['user'] = request.user
         return super().create(validated_data)
 
 
@@ -72,7 +70,7 @@ class PostSerializer(serializers.ModelSerializer):
     is_saved = serializers.SerializerMethodField()
 
     # shares = serializers.SerializerMethodField()
-    # comments = serializers.SerializerMethodField()
+    comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
@@ -81,7 +79,8 @@ class PostSerializer(serializers.ModelSerializer):
             'visibility', 'like_count', 'share_count', 'comment_count',
             'created_at', 'updated_at',
             'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
-            'status', 'caption', 'tags'
+            'status', 'caption', 'tags',
+            'comments'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
