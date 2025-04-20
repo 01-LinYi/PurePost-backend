@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Post, Folder, SavedPost, Like, Share, Comment
+from .models import Post, Folder, SavedPost, Like, Share, Comment, Report
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -235,3 +235,47 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
+    
+class ReportSerializer(serializers.ModelSerializer):
+    reporter = UserSerializer(read_only=True)
+    post = PostSerializer(read_only=True)
+    post_id = serializers.IntegerField(write_only=True)
+    reason_display = serializers.CharField(source='get_reason_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = Report
+        fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display', 
+                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
+        read_only_fields = ['status', 'created_at', 'updated_at']
+    
+    def validate_post_id(self, value):
+        try:
+            Post.objects.get(id=value)
+        except Post.DoesNotExist:
+            raise serializers.ValidationError("Post does not exist")
+        return value
+    
+    def validate(self, data):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            if Report.objects.filter(post_id=data['post_id'], reporter=request.user).exists():
+                raise serializers.ValidationError("You have already reported this post")
+        return data
+
+class ReportUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Report
+        fields = ['status']
+
+class ReportStatsSerializer(serializers.Serializer):
+    """
+    Report statistics serializer.
+    This serializer is used to serialize the report statistics data.
+    
+    """
+    total = serializers.IntegerField()
+    by_status = serializers.DictField(child=serializers.IntegerField())
+    by_reason = serializers.ListField(child=serializers.DictField())
+    trend = serializers.ListField(child=serializers.DictField())
+    top_reported_posts = serializers.ListField(child=serializers.DictField())
