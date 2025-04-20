@@ -11,7 +11,7 @@ from .serializers import RegisterSerializer, LoginSerializer, DeleteAccountSeria
 
 from .models import User
 from .. import settings
-from ..notification_service.email_service import send_email_async
+from ..notification_service.utils import send_email_async
 
 # Initialize Redis connection
 redis_client = redis.StrictRedis(
@@ -83,6 +83,7 @@ class DeleteAccountView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 '''
 class FollowingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -129,6 +130,7 @@ class UnfollowUserView(APIView):
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 '''
+
 
 class UserVisibilityView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -321,12 +323,12 @@ class ForgetPasswordView(APIView):
             status=status.HTTP_200_OK
         )
 
+
 class CheckAdminView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get(self, request):
         return Response({
             'is_admin': request.user.is_admin,
             'is_superuser': request.user.is_superuser
         })
-    
