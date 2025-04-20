@@ -68,7 +68,7 @@ class PostViewSet(viewsets.ModelViewSet):
     permission_classes = [
         permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['content']
+    search_fields = ['content', 'caption', 'tags']
     ordering_fields = ['created_at', 'like_count',
                        'comment_count', 'share_count']
     ordering = ['-created_at']  # Default order by creation time descending
