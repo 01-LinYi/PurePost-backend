@@ -64,14 +64,25 @@ class UserProfileView(generics.ListAPIView):
 
 class PostViewSet(viewsets.ModelViewSet):
     """Post ViewSet - Handles CRUD operations for Post model"""
+
+    class CustomSearchFilter(filters.SearchFilter):
+        """Custom search filter to allow searching by specific fields"""
+
+        def get_search_fields(self, view, request):
+            only_field = request.query_params.get('only')
+            if only_field:
+                return [only_field]
+            return super().get_search_fields(view, request)
+
     queryset = Post.objects.all()
     permission_classes = [
         permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['content', 'caption', 'tags']
+    search_fields = ['content', 'caption', 'tags', '=user__username']
     ordering_fields = ['created_at', 'like_count',
                        'comment_count', 'share_count']
     ordering = ['-created_at']  # Default order by creation time descending
+    filter_backends = [CustomSearchFilter, filters.OrderingFilter]
+    pagination_class = ProfilePostPagination
 
     def get_serializer_class(self):
         """Choose appropriate serializer based on action type"""
