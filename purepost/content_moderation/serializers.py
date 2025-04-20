@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Post, Folder, SavedPost, Like, Share, Comment, Tag
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -168,7 +169,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = ['id', 'content', 'image',
                   'video', 'visibility', 'disclaimer','status',
-                  'tags', 'caption']
+                  'tags', 'caption',
+                  'is_scheduled', 'scheduled_time']
 
     def validate(self, data):
         if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):
@@ -188,6 +190,15 @@ class PostCreateSerializer(serializers.ModelSerializer):
             if len(data['tags']) > 10:
                 raise serializers.ValidationError(
                     {'tags': "Cannot add more than 10 tags to a post"})
+        
+        if data.get('is_scheduled'):
+            if not data.get('scheduled_time'):
+                raise serializers.ValidationError(
+                    "Scheduled time is required when is_scheduled is True")
+            if data['scheduled_time'] <= timezone.now():
+                raise serializers.ValidationError(
+                    "Scheduled time must be in the future")
+            data['status'] = 'draft'  # Force scheduled posts to be drafts initially
 
         return data
     

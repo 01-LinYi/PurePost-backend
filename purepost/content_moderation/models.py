@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
 
 
 class Post(models.Model):
@@ -50,6 +51,20 @@ class Post(models.Model):
     )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='published')
 
+    is_scheduled = models.BooleanField(
+        default=False,
+        help_text="Whether this post is scheduled for future publishing"
+    )
+    scheduled_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this post should be automatically published"
+    )
+    is_published = models.BooleanField(
+        default=False,
+        help_text="Whether this scheduled post has been published"
+    )
+
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
     # comments = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Comment", related_name="commented_posts")
@@ -63,7 +78,8 @@ class Post(models.Model):
 
     def __str__(self):
         """String representation"""
-        status_text = f" ({self.get_status_display()})" if self.status != 'published' else ""
+        if self.is_scheduled:
+            return f"Scheduled post by {self.user.username} at {self.scheduled_time}"
         return f"Post by {self.user.username} at {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
     def save(self, *args, **kwargs):
@@ -73,6 +89,12 @@ class Post(models.Model):
             if not (self.content or self.image or self.video):
                 raise ValueError("Post must have at least content, image, or video")
 
+        # Handle scheduled post publishing if time has come
+        if self.is_scheduled and self.scheduled_time and self.scheduled_time <= timezone.now() and not self.is_published:
+            self.status = 'published'
+            self.is_published = True
+            self.is_scheduled = False
+            
         super().save(*args, **kwargs)
 
 

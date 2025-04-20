@@ -76,6 +76,13 @@ class PostViewSet(viewsets.ModelViewSet):
         """Filter queryset based on request parameters"""
         queryset = Post.objects.all()
 
+        if self.action == 'scheduled':
+            return queryset.filter(
+                user=self.request.user,
+                is_scheduled=True,
+                is_published=False
+            ).order_by('scheduled_time')
+        
         # Filter by visibility - only owner can see their private posts and drafts
         if self.request.user.is_authenticated:
             queryset = queryset.filter(
@@ -108,7 +115,14 @@ class PostViewSet(viewsets.ModelViewSet):
                 )
             queryset = queryset.filter(pinned=pinned)
 
-        return queryset
+        # Exclude scheduled posts from regular listings unless specifically requested
+        if not self.request.query_params.get('include_scheduled'):
+            queryset = queryset.filter(
+                Q(is_scheduled=False) | 
+                Q(user=self.request.user, is_scheduled=True)
+            )
+
+        return queryset.order_by('-created_at')
 
     def perform_create(self, serializer):
         """Set current user as author when creating a post"""
@@ -330,6 +344,39 @@ class PostViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(posts)
         serializer = self.get_serializer(page, many=True)
         return Response(serializer.data)
+    
+
+    @action(detail=False, methods=['get'], url_path='scheduled')
+    def scheduled_posts(self, request):
+        """Get all scheduled posts for the current user"""
+        queryset = Post.objects.filter(
+            user=request.user,
+            is_scheduled=True,
+            is_published=False
+        ).order_by('scheduled_time')
+        
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='cancel-schedule')
+    def cancel_schedule(self, request, pk=None):
+        """Cancel a scheduled post"""
+        post = self.get_object()
+        if post.user != request.user:
+            return Response(
+                {'error': 'You can only cancel your own scheduled posts'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        post.is_scheduled = False
+        post.scheduled_time = None
+        post.save()
+        
+        return Response(
+            {'message': 'Post scheduling cancelled successfully'},
+            status=status.HTTP_200_OK
+        )
 
 
 class FolderViewSet(viewsets.ModelViewSet):

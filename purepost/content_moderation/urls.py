@@ -23,4 +23,6 @@ urlpatterns = [
     path('posts/save-draft/', PostViewSet.as_view({'post': 'save_draft'}), name='post-save-draft'),
     path('posts/<int:pk>/publish/', PostViewSet.as_view({'post': 'publish_draft'}), name='post-publish-draft'),
     path('posts/by-tag/', PostViewSet.as_view({'get': 'by_tag'}), name='post-by-tag'),
+    path('posts/scheduled/', PostViewSet.as_view({'get': 'scheduled'}), name='post-scheduled'),
+    path('posts/<int:pk>/cancel-schedule/', PostViewSet.as_view({'post': 'cancel_schedule'}), name='post-cancel-schedule'),
 ]
