@@ -6,6 +6,8 @@ from .models import Post, Folder, SavedPost, Comment, Like, Share, Tag
 import tempfile
 from PIL import Image
 import json
+from django.utils import timezone
+from datetime import timedelta
 
 
 from django.contrib.auth import get_user_model
@@ -962,3 +964,147 @@ class PostCaptionAndTagsTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['content'], 'Post with tag1')
+
+
+class PostSchedulingTestCase(APITestCase):
+    """Test cases for Post Scheduling functionality"""
+
+    def setUp(self):
+        """Set up test data"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@email.com',
+            password='password123'
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+        # Create test posts
+        self.published_post = Post.objects.create(
+            user=self.user,
+            content='Published post',
+            status='published'
+        )
+
+        self.draft_post = Post.objects.create(
+            user=self.user,
+            content='Draft post',
+            status='draft'
+        )
+
+        self.scheduled_post = Post.objects.create(
+            user=self.user,
+            content='Scheduled post',
+            status='draft',
+            is_scheduled=True,
+            scheduled_time=timezone.now() + timedelta(days=1)
+        )
+
+    def test_create_scheduled_post(self):
+        """Test creating a new scheduled post"""
+        post_data = {
+            'content': 'New scheduled post',
+            'is_scheduled': True,
+            'scheduled_time': (timezone.now() + timedelta(hours=1)).isoformat(),
+            'status': 'draft'
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['is_scheduled'])
+        self.assertEqual(response.data['status'], 'draft')
+
+    def test_create_invalid_scheduled_post(self):
+        """Test creating a scheduled post with invalid data"""
+        # Past scheduled time
+        post_data = {
+            'content': 'Invalid scheduled post',
+            'is_scheduled': True,
+            'scheduled_time': (timezone.now() - timedelta(hours=1)).isoformat()
+        }
+        response = self.client.post(
+            reverse('posts-list'),
+            data=post_data,
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('scheduled_time', response.data)
+
+    def test_list_scheduled_posts(self):
+        """Test listing scheduled posts"""
+        response = self.client.get(reverse('post-scheduled'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        data = json.loads(response.content)
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['id'], self.scheduled_post.id)
+
+    def test_cancel_scheduled_post(self):
+        """Test canceling a scheduled post"""
+        response = self.client.post(
+            reverse('post-cancel-schedule', kwargs={'pk': self.scheduled_post.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Refresh from db
+        self.scheduled_post.refresh_from_db()
+        self.assertFalse(self.scheduled_post.is_scheduled)
+        self.assertIsNone(self.scheduled_post.scheduled_time)
+
+    def test_cancel_non_scheduled_post(self):
+        """Test canceling a post that isn't scheduled"""
+        response = self.client.post(
+            reverse('post-cancel-schedule', kwargs={'pk': self.published_post.id})
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_edit_scheduled_post(self):
+        """Test editing a scheduled post"""
+        new_time = timezone.now() + timedelta(hours=2)
+        response = self.client.patch(
+            reverse('posts-detail', kwargs={'pk': self.scheduled_post.id}),
+            data={
+                'scheduled_time': new_time.isoformat(),
+                'content': 'Updated content'
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from db
+        self.scheduled_post.refresh_from_db()
+        self.assertEqual(
+            self.scheduled_post.scheduled_time.replace(tzinfo=None),
+            new_time.replace(tzinfo=None)
+        )
+        self.assertEqual(self.scheduled_post.content, 'Updated content')
+
+    def test_publish_scheduled_post_early(self):
+        """Test manually publishing a scheduled post"""
+        response = self.client.patch(
+            reverse('posts-detail', kwargs={'pk': self.scheduled_post.id}),
+            data={
+                'status': 'published',
+                'is_scheduled': False,
+                'scheduled_time': None
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Refresh from db
+        self.scheduled_post.refresh_from_db()
+        self.assertEqual(self.scheduled_post.status, 'published')
+        self.assertFalse(self.scheduled_post.is_scheduled)
+
+    def test_scheduled_post_visibility(self):
+        """Test scheduled posts aren't visible in regular listings"""
+        response = self.client.get(reverse('posts-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        data = json.loads(response.content)
+        post_ids = [post['id'] for post in data['results']]
+        self.assertNotIn(self.scheduled_post.id, post_ids)
