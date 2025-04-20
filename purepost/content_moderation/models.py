@@ -51,6 +51,9 @@ class Post(models.Model):
     caption = models.CharField(max_length=100, blank=True, null=True)
     # Add tags field - using JSONField to store array of strings
     tags = models.JSONField(default=list, blank=True, null=True)
+    caption = models.CharField(max_length=100, blank=True, null=True)
+    # Add tags field - using JSONField to store array of strings
+    tags = models.JSONField(default=list, blank=True, null=True)
 
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
@@ -74,9 +77,6 @@ class Post(models.Model):
         if self.status != 'draft':
             if not (self.content or self.image or self.video):
                 raise ValueError("Post must have at least content, image, or video")
-
-        if self.tags is None:
-            self.tags = []
 
         if self.tags is None:
             self.tags = []
