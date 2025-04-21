@@ -519,10 +519,10 @@ class PostInteractionViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     def list_comments(self, request, pk=None):
-        """Retrieve the list of comments for a post"""
+        """Retrieve the list of users who commented on a post"""
         post = get_object_or_404(Post, id=pk)
-        comments = post.comments.filter(parent=None)
-        serializer = CommentSerializer(comments, many=True)
+        users = User.objects.filter(comment__post=post).distinct()
+        serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
 
