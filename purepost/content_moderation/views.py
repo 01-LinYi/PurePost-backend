@@ -349,7 +349,8 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return only folders owned by the current user"""
-        return Folder.objects.filter(user=self.request.user)
+        return Folder.objects.filter(user=self.request.user).annotate(
+            post_count=Count('saved_posts'))
 
     def perform_create(self, serializer):
         """Set current user as owner when creating a folder"""
@@ -357,13 +358,15 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def posts(self, request, pk=None):
-        """Get posts in a folder"""
         folder = self.get_object()
-        saved_posts = SavedPost.objects.filter(
-            folder=folder, user=request.user)
-        serializer = SavedPostListSerializer(
+        saved_posts = SavedPost.objects.filter(folder=folder)
+        folder_serializer = self.get_serializer(folder)
+        post_serializer = SavedPostListSerializer(
             saved_posts, many=True, context={'request': request})
-        return Response(serializer.data)
+        return Response({
+            "folder": folder_serializer.data,
+            "posts": post_serializer.data
+        })
 
 
 class SavedPostViewSet(viewsets.ModelViewSet):
@@ -393,6 +396,22 @@ class SavedPostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set current user as owner when creating a saved post"""
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['delete'], url_path='by-post')
+    def delete_by_post(self, request):
+        """
+        delete a saved post by post_id.
+        """
+        post_id = request.query_params.get('post_id')
+        if not post_id:
+            return Response({'detail': 'post_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Only delete if the post is saved by the user
+        qs = SavedPost.objects.filter(user=request.user, post_id=post_id)
+        deleted, _ = qs.delete()
+        if deleted:
+            return Response({'detail': 'Unsave success'}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'detail': 'No saved post found'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=False, methods=['post'], url_path='toggle')
     def toggle_save(self, request):

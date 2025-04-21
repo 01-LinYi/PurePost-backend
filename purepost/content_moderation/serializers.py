@@ -150,16 +150,13 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
 class FolderSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    post_count = serializers.SerializerMethodField()
+    post_count = serializers.IntegerField(read_only=True);
 
     class Meta:
         model = Folder
         fields = ['id', 'user', 'name',
                   'created_at', 'updated_at', 'post_count']
         read_only_fields = ['user', 'created_at', 'updated_at', 'post_count']
-
-    def get_post_count(self, obj):
-        return obj.saved_posts.count()
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -194,8 +191,8 @@ class SavedPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = SavedPost
         fields = ['id', 'user', 'post', 'post_id',
-                  'folder', 'folder_id', 'saved_at']
-        read_only_fields = ['user', 'post', 'folder', 'saved_at']
+                  'folder', 'folder_id', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'post', 'folder', 'created_at', 'updated_at']
 
     def validate_folder_id(self, value):
         if value and value.user != self.context['request'].user:
@@ -230,7 +227,7 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SavedPost
-        fields = ['id', 'post', 'folder_name', 'saved_at']
+        fields = ['id', 'post', 'folder_name', 'updated_at']
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
