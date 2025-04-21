@@ -771,12 +771,20 @@ class PostCaptionAndTagsTestCase(APITestCase):
     def test_create_post_with_caption_and_tags(self):
         """Test creating a post with caption and tags"""
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=self.valid_post_data,
             format='json'
         )
+
+        if response.status_code == 404:
+            print("Endpoint not found. Check your URL configuration.")
+            print("Attempted URL:", reverse('post-list'))
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         
+        if 'caption' not in response.data:
+            print("Unexpected response structure:", response.data)
+
         # Check caption was saved
         self.assertEqual(response.data['caption'], 'This is a test caption')
         
@@ -796,7 +804,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'visibility': 'public'
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -815,7 +823,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'visibility': 'public'
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -830,14 +838,14 @@ class PostCaptionAndTagsTestCase(APITestCase):
         """Test viewing a post with caption and tags"""
 
         create_response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=self.valid_post_data,
             format='json'
         )
         post_id = create_response.data['id']
 
         retrieve_response = self.client.get(
-            reverse('posts-detail', kwargs={'pk': post_id})
+            reverse('post-detail', kwargs={'pk': post_id})
         )
         self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
         
@@ -852,7 +860,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
         """Test updating a post's caption and tags"""
 
         create_response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=self.valid_post_data,
             format='json'
         )
@@ -863,7 +871,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'tags': ['updatedtag1', 'updatedtag2']
         }
         update_response = self.client.patch(
-            reverse('posts-detail', kwargs={'pk': post_id}),
+            reverse('post-detail', kwargs={'pk': post_id}),
             data=update_data,
             format='json'
         )
@@ -880,7 +888,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
         """Test removing caption and tags from a post"""
 
         create_response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=self.valid_post_data,
             format='json'
         )
@@ -892,7 +900,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'tags': []
         }
         update_response = self.client.patch(
-            reverse('posts-detail', kwargs={'pk': post_id}),
+            reverse('post-detail', kwargs={'pk': post_id}),
             data=update_data,
             format='json'
         )
@@ -910,7 +918,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'visibility': 'public'
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -928,7 +936,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             'visibility': 'public'
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -939,7 +947,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
         """Test searching posts by tag"""
         # Create posts with different tags
         self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data={
                 'content': 'Post with tag1',
                 'tags': ['tag1'],
@@ -948,7 +956,7 @@ class PostCaptionAndTagsTestCase(APITestCase):
             format='json'
         )
         self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data={
                 'content': 'Post with tag2',
                 'tags': ['tag2'],
@@ -1009,7 +1017,7 @@ class PostSchedulingTestCase(APITestCase):
             'status': 'draft'
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -1026,7 +1034,7 @@ class PostSchedulingTestCase(APITestCase):
             'scheduled_time': (timezone.now() - timedelta(hours=1)).isoformat()
         }
         response = self.client.post(
-            reverse('posts-list'),
+            reverse('post-list'),
             data=post_data,
             format='json'
         )
@@ -1065,7 +1073,7 @@ class PostSchedulingTestCase(APITestCase):
         """Test editing a scheduled post"""
         new_time = timezone.now() + timedelta(hours=2)
         response = self.client.patch(
-            reverse('posts-detail', kwargs={'pk': self.scheduled_post.id}),
+            reverse('post-detail', kwargs={'pk': self.scheduled_post.id}),
             data={
                 'scheduled_time': new_time.isoformat(),
                 'content': 'Updated content'
@@ -1085,7 +1093,7 @@ class PostSchedulingTestCase(APITestCase):
     def test_publish_scheduled_post_early(self):
         """Test manually publishing a scheduled post"""
         response = self.client.patch(
-            reverse('posts-detail', kwargs={'pk': self.scheduled_post.id}),
+            reverse('post-detail', kwargs={'pk': self.scheduled_post.id}),
             data={
                 'status': 'published',
                 'is_scheduled': False,
@@ -1102,7 +1110,7 @@ class PostSchedulingTestCase(APITestCase):
 
     def test_scheduled_post_visibility(self):
         """Test scheduled posts aren't visible in regular listings"""
-        response = self.client.get(reverse('posts-list'))
+        response = self.client.get(reverse('post-list'))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         data = json.loads(response.content)

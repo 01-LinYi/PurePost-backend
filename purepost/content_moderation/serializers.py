@@ -203,6 +203,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
+        validated_data.pop('user', None)
         tag_names = validated_data.pop('tags', [])
         post = Post.objects.create(user=self.context['request'].user, **validated_data)
         tags = self._get_or_create_tags(tag_names)
@@ -211,13 +212,24 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         tag_names = validated_data.pop('tags', None)
+        if 'caption' in validated_data:
+            instance.caption = validated_data['caption']
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         if tag_names is not None:
-            tags = self._get_or_create_tags(tag_names)
+            tags = []
+            for name in tag_names:
+                tag, _ = Tag.objects.get_or_create(name=name.lower().strip())
+                tags.append(tag)
             instance.tags.set(tags)
         return instance
+
+    def to_representation(self, instance):
+        """Custom representation to include tag names"""
+        representation = super().to_representation(instance)
+        representation['tags'] = [tag.name for tag in instance.tags.all()]
+        return representation
 
     def _get_or_create_tags(self, tag_names):
         """Utility to get or create Tag objects from a list of names"""

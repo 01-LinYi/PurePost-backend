@@ -3,7 +3,7 @@ from django.urls import path, include
 from .views import PostViewSet, FolderViewSet, SavedPostViewSet, PostInteractionViewSet
 
 router = DefaultRouter()
-router.register(r'posts', PostViewSet)
+router.register(r'posts', PostViewSet, basename='post')
 router.register(r'folders', FolderViewSet, basename='folder')
 router.register(r'saved-posts', SavedPostViewSet, basename='saved-post')
 

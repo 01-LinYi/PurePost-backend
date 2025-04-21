@@ -126,7 +126,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Set current user as author when creating a post"""
-        serializer.save(user=self.request.user)
+        #serializer.save(user=self.request.user)
+        serializer.save()
 
     def perform_update(self, serializer):
         """Update post and handle disclaimer"""
