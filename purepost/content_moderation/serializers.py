@@ -118,7 +118,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'content', 'image',
-                  'video', 'visibility', 'disclaimer','status',
+                  'video', 'visibility', 'disclaimer', 'status',
                   'caption', 'tags']
 
     def validate(self, data):
@@ -126,21 +126,22 @@ class PostCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
 
-
         # Validate tags (if provided)
         tags = data.get('tags')
         if tags:
             # Ensure tags is a list
             if not isinstance(tags, list):
                 raise serializers.ValidationError("Tags must be a list")
-            
+
             # Validate each tag
             for tag in tags:
                 if not isinstance(tag, str):
-                    raise serializers.ValidationError("Each tag must be a string")
+                    raise serializers.ValidationError(
+                        "Each tag must be a string")
                 if len(tag) > 30:
-                    raise serializers.ValidationError("Tags cannot exceed 30 characters")
-            
+                    raise serializers.ValidationError(
+                        "Tags cannot exceed 30 characters")
+
             # Limit number of tags
             if len(tags) > 10:
                 raise serializers.ValidationError("Maximum 10 tags allowed")
@@ -150,7 +151,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
 class FolderSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
-    post_count = serializers.IntegerField(read_only=True);
+    post_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Folder
@@ -192,7 +193,8 @@ class SavedPostSerializer(serializers.ModelSerializer):
         model = SavedPost
         fields = ['id', 'user', 'post', 'post_id',
                   'folder', 'folder_id', 'created_at', 'updated_at']
-        read_only_fields = ['user', 'post', 'folder', 'created_at', 'updated_at']
+        read_only_fields = ['user', 'post',
+                            'folder', 'created_at', 'updated_at']
 
     def validate_folder_id(self, value):
         if value and value.user != self.context['request'].user:
@@ -231,47 +233,73 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
-    
+
+
 class ReportSerializer(serializers.ModelSerializer):
     reporter = UserSerializer(read_only=True)
     post = PostSerializer(read_only=True)
     post_id = serializers.IntegerField(write_only=True)
-    reason_display = serializers.CharField(source='get_reason_display', read_only=True)
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    
+    reason_display = serializers.CharField(
+        source='get_reason_display', read_only=True)
+    status_display = serializers.CharField(
+        source='get_status_display', read_only=True)
+
     class Meta:
         model = Report
-        fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display', 
+        fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display',
                   'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
-        read_only_fields = ['status', 'created_at', 'updated_at','reporter']
-    
+        read_only_fields = ['status', 'created_at', 'updated_at', 'reporter']
+
     def validate_post_id(self, value):
         try:
             Post.objects.get(id=value)
         except Post.DoesNotExist:
             raise serializers.ValidationError("Post does not exist")
         return value
-    
+
     def validate(self, data):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             if Report.objects.filter(post_id=data['post_id'], reporter=request.user).exists():
-                raise serializers.ValidationError("You have already reported this post")
+                raise serializers.ValidationError(
+                    "You have already reported this post")
         return data
+
 
 class ReportUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = ['status']
 
+
 class ReportStatsSerializer(serializers.Serializer):
     """
     Report statistics serializer.
     This serializer is used to serialize the report statistics data.
-    
+
     """
     total = serializers.IntegerField()
     by_status = serializers.DictField(child=serializers.IntegerField())
     by_reason = serializers.ListField(child=serializers.DictField())
     trend = serializers.ListField(child=serializers.DictField())
     top_reported_posts = serializers.ListField(child=serializers.DictField())
+
+
+class ReportMiniSerializer(serializers.ModelSerializer):
+    '''
+    `ReportMiniSerializer`:
+    The `ReportMiniSerializer` is used to display full info for admins and staff.
+    This serializer is used to serialize the report data for the users.
+    
+    It includes only the necessary fields for displaying a list of reports.
+    '''
+    post_id = serializers.IntegerField(source='post.id', read_only=True)
+    reason_display = serializers.CharField(
+        source='get_reason_display', read_only=True)
+    status_display = serializers.CharField(
+        source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Report
+        fields = ['id', 'post_id', 'reason', 'reason_display',
+                  'status', 'status_display', 'created_at']

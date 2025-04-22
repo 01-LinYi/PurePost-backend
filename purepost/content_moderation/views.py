@@ -11,8 +11,8 @@ from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
     UserSerializer, PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    CommentSerializer, ShareSerializer, ReportSerializer,
-    ReportUpdateSerializer, ReportStatsSerializer,
+    CommentSerializer, ShareSerializer, 
+    ReportSerializer, ReportUpdateSerializer, ReportStatsSerializer, ReportMiniSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsReporterOrAdmin
 from .throttling import ReportRateThrottle
@@ -513,7 +513,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     search_fields = ['reason', 'additional_info', 'post__title']
     ordering_fields = ['created_at', 'updated_at', 'status']
     ordering = ['-created_at']
-    throttle_classes = [ReportRateThrottle]
+    throttle_classes = []
 
     def get_queryset(self):
         user = self.request.user
@@ -536,6 +536,16 @@ class ReportViewSet(viewsets.ModelViewSet):
         elif self.action in ['stats', 'pending', 'resolve', 'reject', 'bulk_update']:
             return [IsAdminUser()]
         return [permissions.IsAuthenticated()]
+    
+    def get_throttles(self):
+        if self.action == 'create':
+            # Apply throttling only for the create action
+            self.throttle_scope = 'report_create'
+            self.throttle_classes = [ReportRateThrottle]
+        else:
+            # Use default throttling for other actions
+            self.throttle_classes = []
+        return [throttle() for throttle in self.throttle_classes]
 
     def perform_create(self, serializer):
         """create a new report and send notification"""
@@ -628,9 +638,9 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         page = self.paginate_queryset(reports)
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer = ReportMiniSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(reports, many=True)
+        serializer = ReportMiniSerializer(reports, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
