@@ -243,7 +243,7 @@ class ReportSerializer(serializers.ModelSerializer):
         model = Report
         fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display', 
                   'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
-        read_only_fields = ['status', 'created_at', 'updated_at']
+        read_only_fields = ['status', 'created_at', 'updated_at','reporter']
     
     def validate_post_id(self, value):
         try:
