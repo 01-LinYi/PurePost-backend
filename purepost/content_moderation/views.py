@@ -579,6 +579,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         """create a new report and send notification"""
         try:
             post_id = serializer.validated_data.get('post_id')
+            post = get_object_or_404(Post, id=post_id)
             user = self.request.user
 
             # check if the post exists
@@ -587,7 +588,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     {"non_field_errors": [_("You have already reported this post")]})
 
             # save
-            report = serializer.save(reporter=user)
+            report = serializer.save(reporter=user, post=post)
 
             '''
             # send notification to the reporter
