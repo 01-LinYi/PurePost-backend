@@ -11,8 +11,8 @@ from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
     UserSerializer, PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    CommentSerializer, ShareSerializer, ReportSerializer,
-    ReportUpdateSerializer, ReportStatsSerializer,
+    CommentSerializer, ShareSerializer, 
+    ReportSerializer, ReportUpdateSerializer, ReportStatsSerializer, ReportMiniSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsReporterOrAdmin
 from .throttling import ReportRateThrottle
@@ -349,7 +349,8 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return only folders owned by the current user"""
-        return Folder.objects.filter(user=self.request.user)
+        return Folder.objects.filter(user=self.request.user).annotate(
+            post_count=Count('saved_posts'))
 
     def perform_create(self, serializer):
         """Set current user as owner when creating a folder"""
@@ -357,13 +358,15 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def posts(self, request, pk=None):
-        """Get posts in a folder"""
         folder = self.get_object()
-        saved_posts = SavedPost.objects.filter(
-            folder=folder, user=request.user)
-        serializer = SavedPostListSerializer(
+        saved_posts = SavedPost.objects.filter(folder=folder)
+        folder_serializer = self.get_serializer(folder)
+        post_serializer = SavedPostListSerializer(
             saved_posts, many=True, context={'request': request})
-        return Response(serializer.data)
+        return Response({
+            "folder": folder_serializer.data,
+            "posts": post_serializer.data
+        })
 
 
 class SavedPostViewSet(viewsets.ModelViewSet):
@@ -393,6 +396,22 @@ class SavedPostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set current user as owner when creating a saved post"""
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['delete'], url_path='by-post')
+    def delete_by_post(self, request):
+        """
+        delete a saved post by post_id.
+        """
+        post_id = request.query_params.get('post_id')
+        if not post_id:
+            return Response({'detail': 'post_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Only delete if the post is saved by the user
+        qs = SavedPost.objects.filter(user=request.user, post_id=post_id)
+        deleted, _ = qs.delete()
+        if deleted:
+            return Response({'detail': 'Unsave success'}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'detail': 'No saved post found'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=False, methods=['post'], url_path='toggle')
     def toggle_save(self, request):
@@ -462,10 +481,10 @@ class PostInteractionViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     def list_comments(self, request, pk=None):
-        """Retrieve the list of comments for a post"""
+        """Retrieve the list of users who commented on a post"""
         post = get_object_or_404(Post, id=pk)
-        comments = post.comments.filter(parent=None)
-        serializer = CommentSerializer(comments, many=True)
+        users = User.objects.filter(comment__post=post).distinct()
+        serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
 
@@ -494,7 +513,7 @@ class ReportViewSet(viewsets.ModelViewSet):
     search_fields = ['reason', 'additional_info', 'post__title']
     ordering_fields = ['created_at', 'updated_at', 'status']
     ordering = ['-created_at']
-    throttle_classes = [ReportRateThrottle]
+    throttle_classes = []
 
     def get_queryset(self):
         user = self.request.user
@@ -517,11 +536,22 @@ class ReportViewSet(viewsets.ModelViewSet):
         elif self.action in ['stats', 'pending', 'resolve', 'reject', 'bulk_update']:
             return [IsAdminUser()]
         return [permissions.IsAuthenticated()]
+    
+    def get_throttles(self):
+        if self.action == 'create':
+            # Apply throttling only for the create action
+            self.throttle_scope = 'report_create'
+            self.throttle_classes = [ReportRateThrottle]
+        else:
+            # Use default throttling for other actions
+            self.throttle_classes = []
+        return [throttle() for throttle in self.throttle_classes]
 
     def perform_create(self, serializer):
         """create a new report and send notification"""
         try:
             post_id = serializer.validated_data.get('post_id')
+            post = get_object_or_404(Post, id=post_id)
             user = self.request.user
 
             # check if the post exists
@@ -530,7 +560,7 @@ class ReportViewSet(viewsets.ModelViewSet):
                     {"non_field_errors": [_("You have already reported this post")]})
 
             # save
-            report = serializer.save(reporter=user)
+            report = serializer.save(reporter=user, post=post)
 
             '''
             # send notification to the reporter
@@ -608,9 +638,9 @@ class ReportViewSet(viewsets.ModelViewSet):
 
         page = self.paginate_queryset(reports)
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer = ReportMiniSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(reports, many=True)
+        serializer = ReportMiniSerializer(reports, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
