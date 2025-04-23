@@ -6,6 +6,11 @@ from rest_framework.serializers import ValidationError
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from django.utils.dateparse import parse_datetime
+from django.utils.timezone import is_aware, make_aware
+from django.utils import timezone
+
+
 
 from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
@@ -340,6 +345,58 @@ class PostViewSet(viewsets.ModelViewSet):
         # Return the updated post
         serializer = self.get_serializer(post)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='schedule')
+    def schedule_post(self, request, pk=None):
+        """Schedule a post for future publication"""
+        post = self.get_object()
+        
+        # Make sure the post belongs to the requesting user
+        if post.user != request.user:
+            return Response(
+                {"detail": "You don't have permission to schedule this post."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get scheduled_for from request data
+        scheduled_for = request.data.get('scheduled_for')
+        if not scheduled_for:
+            return Response(
+                {"detail": "scheduled_for date is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Parse the datetime string
+            scheduled_datetime = parse_datetime(scheduled_for)
+            if not scheduled_datetime:
+                raise ValueError("Invalid datetime format")
+                
+            # Ensure timezone awareness
+            if not is_aware(scheduled_datetime):
+                scheduled_datetime = make_aware(scheduled_datetime)
+            
+            # Ensure the scheduled time is in the future
+            if scheduled_datetime <= timezone.now():
+                return Response(
+                    {"detail": "Scheduled time must be in the future"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Update the post
+            post.status = 'scheduled'
+            post.scheduled_for = scheduled_datetime
+            post.save()
+            
+            serializer = self.get_serializer(post)
+            return Response(serializer.data)
+            
+        except ValueError as e:
+            return Response(
+                {"detail": str(e) or "Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 
 class FolderViewSet(viewsets.ModelViewSet):
