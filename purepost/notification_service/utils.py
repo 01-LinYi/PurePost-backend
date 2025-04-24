@@ -6,18 +6,35 @@ from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 
 from purepost import settings
-from .models import Notification
+from .models import Notification, NotificationPreference
 
 
 def send_notification(recipient_profile, notification_type, message, related_object=None):
     """
-    Send a notification to a user
+    Send a notification to a user if they have enabled that notification type
     Args:
         recipient_profile: Profile model instance
         notification_type: str, one of Notification.NOTIFICATION_TYPES
         message: str, notification message
         related_object: Optional model instance related to the notification
     """
+    # Check if the user has disabled this notification type
+    try:
+        preference = NotificationPreference.objects.get(
+            profile=recipient_profile,
+            notification_type=notification_type
+        )
+        if not preference.enabled:
+            # User has disabled this notification type
+            return None
+    except NotificationPreference.DoesNotExist:
+        # If no preference exists, create one with default (enabled=True)
+        NotificationPreference.objects.create(
+            profile=recipient_profile,
+            notification_type=notification_type,
+            enabled=True
+        )
+
     # Create notification in database
     notification = Notification.objects.create(
         recipient=recipient_profile,
@@ -44,6 +61,8 @@ def send_notification(recipient_profile, notification_type, message, related_obj
             'notification': notification_data
         }
     )
+
+    return notification
 
 
 @shared_task
