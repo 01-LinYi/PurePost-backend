@@ -332,3 +332,11 @@ class CheckAdminView(APIView):
             'is_admin': request.user.is_admin,
             'is_superuser': request.user.is_superuser
         })
+
+class UserCountView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        """Get the total number of active users."""
+        user_count = User.objects.filter(is_active=True).count()
+        return Response({"user_count": user_count}, status=status.HTTP_200_OK)

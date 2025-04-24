@@ -117,14 +117,15 @@ class SavedPost(models.Model):
         Post, on_delete=models.CASCADE, related_name="saved_by")
     folder = models.ForeignKey(
         Folder, on_delete=models.CASCADE, related_name="saved_posts", null=True, blank=True)
-    saved_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         """Model metadata"""
         db_table = 'content_moderation_saved_post'
         verbose_name = 'Saved Post'
         verbose_name_plural = 'Saved Posts'
-        ordering = ['-saved_at']  # Default order by save time descending
+        ordering = ['-created_at']  # Default order by save time descending
         # Ensure users cannot save the same post to the same folder multiple times
         constraints = [
             models.UniqueConstraint(
