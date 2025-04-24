@@ -521,7 +521,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
     def list_comments(self, request, pk=None):
         """Retrieve the list of users who commented on a post"""
         post = get_object_or_404(Post, id=pk)
-        users = User.objects.filter(comment__post=post).distinct()
+        users = User.objects.filter(comments__post=post).distinct()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
@@ -811,7 +811,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             Post.objects.annotate(report_count=Count('reports'))
             .filter(report_count__gt=0)
             .order_by('-report_count')[:5]
-            .values('id', 'title', 'report_count')
+            .values('id', 'caption', 'report_count')
         )
 
         data = {
