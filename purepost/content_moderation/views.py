@@ -340,6 +340,22 @@ class PostViewSet(viewsets.ModelViewSet):
         # Return the updated post
         serializer = self.get_serializer(post)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def admin_count(self, request):
+        count = Post.objects.filter(Q(visibility='public', status='published')).count()
+        return Response({"post_count": count})
+    
+    @action(detail=False, methods=['get'])
+    def admin_posts(self, request):
+        """Get all posts for admin view"""
+        queryset = Post.objects.all()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -483,7 +499,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
     def list_comments(self, request, pk=None):
         """Retrieve the list of users who commented on a post"""
         post = get_object_or_404(Post, id=pk)
-        users = User.objects.filter(comment__post=post).distinct()
+        users = User.objects.filter(comments__post=post).distinct()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
@@ -773,7 +789,7 @@ class ReportViewSet(viewsets.ModelViewSet):
             Post.objects.annotate(report_count=Count('reports'))
             .filter(report_count__gt=0)
             .order_by('-report_count')[:5]
-            .values('id', 'title', 'report_count')
+            .values('id', 'caption', 'report_count')
         )
 
         data = {

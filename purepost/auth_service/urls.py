@@ -15,4 +15,5 @@ urlpatterns = [
     path('verify/', EmailVerificationView.as_view(), name='verify'),
     path('forget/', ForgetPasswordView.as_view(), name='forget-password'),
     path('admin/check/', CheckAdminView.as_view(), name='check-admin'),
+    path('admin/active_count/', UserCountView.as_view(), name='user-count'),
 ]
