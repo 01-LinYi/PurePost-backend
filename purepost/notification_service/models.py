@@ -8,6 +8,7 @@ class Notification(models.Model):
         ('like', 'Like'),
         ('comment', 'Comment'),
         ('share', 'Share'),
+        ('follow', 'Follow'),
     )
 
     recipient = models.ForeignKey('user_service.Profile', on_delete=models.CASCADE)
