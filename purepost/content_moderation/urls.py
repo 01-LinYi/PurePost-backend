@@ -1,6 +1,6 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
-from .views import PostViewSet, FolderViewSet, SavedPostViewSet, PostInteractionViewSet, ReportViewSet
+from .views import PostViewSet, FolderViewSet, SavedPostViewSet, PostInteractionViewSet, ReportViewSet, ModerationViewSet
 
 router = DefaultRouter()
 router.register(r'posts', PostViewSet)
@@ -36,6 +36,7 @@ urlpatterns = [
           PostViewSet.as_view({'post': 'save_draft'}), name='post-save-draft'),
      path('posts/<int:pk>/publish/',
           PostViewSet.as_view({'post': 'publish_draft'}), name='post-publish-draft'),
+     path('admin/delete-post/<int:pk>/', ModerationViewSet.as_view({'delete': 'delete'}), name='delete-post'),
      path('posts/<int:pk>/schedule/',
           PostViewSet.as_view({'post': 'schedule_post'}), name='post-schedule'),
 ]
