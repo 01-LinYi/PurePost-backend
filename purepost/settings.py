@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'django_apscheduler',
 
     # Third-party apps
     "rest_framework",
@@ -298,4 +299,16 @@ LOGGING = {
             "propagate": False,
         },
     },
+}
+
+
+# APScheduler settings
+SCHEDULER_CONFIG = {
+    "apscheduler.jobstores.default": {
+        "class": "django_apscheduler.jobstores:DjangoJobStore"
+    },
+    "apscheduler.executors.processpool": {
+        "type": "threadpool",
+        "max_workers": 5
+    }
 }
