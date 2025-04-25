@@ -1,21 +1,22 @@
 import json
-import uuid
 
 from typing import Any
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.serializers.json import DjangoJSONEncoder
-from rest_framework.exceptions import PermissionDenied
 
 from purepost.message_service.models import Message, Conversation
 from purepost.user_service.models import Profile
 
 
 class MessagesConsumer(AsyncWebsocketConsumer):
-    profile: Profile = None  # TODO: update when profile change?
-    conv_id: uuid = None
-    conv_group_name: str = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(args, kwargs)
+        self.conv_group_name = None
+        self.conv_id = None
+        self.profile = None
 
     async def connect(self):
         print(f"MessagesConsumer: Connect method called")
@@ -24,7 +25,7 @@ class MessagesConsumer(AsyncWebsocketConsumer):
 
         # Check if the user is authenticated (after token authentication)
         if not self.scope["user"].is_authenticated:
-            raise PermissionDenied("User is not authenticated.")
+            await self.close(4001, "Unauthorized")
 
         # Fetch the Profile of the authenticated user
         try:
@@ -32,7 +33,7 @@ class MessagesConsumer(AsyncWebsocketConsumer):
                 lambda: Profile.objects.select_related("user").get(user=self.scope["user"])
             )()
         except Profile.DoesNotExist:
-            raise PermissionDenied("Authenticated user does not have an associated profile.")
+            await self.close(4001, "Unauthorized")
 
         print("MessagesConsumer: User is authenticated")
 

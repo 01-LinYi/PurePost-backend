@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "purepost.content_moderation",  # Post Service app
     "purepost.social_service",  # Social Service app
     "purepost.deepfake_detection",  # Deepfake Detection app
+    "purepost.notification_service",  # Notification Service app
 ]
 
 # Middleware
