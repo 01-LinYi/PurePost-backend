@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Like, Comment, Share
+from .models import Like, Comment, Share, Report
 from purepost.notification_service.utils import send_notification
 
 
@@ -36,4 +36,15 @@ def share_notification(sender, instance, created, **kwargs):
             'share',
             f"{instance.user.username} shared your post",
             instance.parent
+        )
+
+
+@receiver(post_save, sender=Report)
+def report_notification(sender, instance, created, **kwargs):
+    if not created:  # Only send notification for update report
+        send_notification(
+            instance.reporter.user_profile,
+            f"report_{instance.status}",
+            f"Your report on {instance.post.user.username}'s post is {instance.status}",
+            instance.post
         )
