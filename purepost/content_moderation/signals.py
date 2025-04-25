@@ -82,7 +82,7 @@ def fill_post_author_username(sender, instance, created, **kwargs):
         send_notification(
             instance.reporter.user_profile,
             "report",
-            f"We' ve received your report on {post_username}'s post. It's now under review, and we will take action if necessary.",
+            f"We' ve received your report on {post_username}'s post.",
             instance.post
         )
 
@@ -90,4 +90,4 @@ def fill_post_author_username(sender, instance, created, **kwargs):
 @receiver(pre_delete, sender=Post)
 def update_report_action_on_post_delete(sender, instance, **kwargs):
     reports = Report.objects.filter(post=instance)
-    reports.update(action_taken="Post deleted")
+    reports.update(action_taken="Post deleted", status="resolved")

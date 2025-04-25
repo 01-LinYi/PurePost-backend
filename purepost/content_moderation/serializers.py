@@ -247,15 +247,10 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display',
-                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
+                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at',
+                  'post_author_username', 'action_taken']
         read_only_fields = ['status', 'created_at', 'updated_at', 'reporter']
 
-    def validate_post_id(self, value):
-        try:
-            Post.objects.get(id=value)
-        except Post.DoesNotExist:
-            raise serializers.ValidationError("Post does not exist")
-        return value
 
     def validate(self, data):
         request = self.context.get('request')
@@ -293,7 +288,10 @@ class ReportMiniSerializer(serializers.ModelSerializer):
     
     It includes only the necessary fields for displaying a list of reports.
     '''
-    post_id = serializers.IntegerField(source='post.id', read_only=True)
+    post_id = serializers.SerializerMethodField()
+
+    def get_post_id(self, obj):
+        return obj.post.id if obj.post else None
     reason_display = serializers.CharField(
         source='get_reason_display', read_only=True)
     status_display = serializers.CharField(
