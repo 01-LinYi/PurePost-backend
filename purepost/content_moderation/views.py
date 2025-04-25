@@ -806,3 +806,32 @@ class ReportViewSet(viewsets.ModelViewSet):
         }
 
         return Response(data)
+
+class ModerationViewSet(viewsets.ViewSet):
+    """
+    Moderation ViewSet - Handles moderation actions on posts.
+
+    Allows admins to:
+    - Delete posts (# Current solution: hard delete)
+    - Block posts (# Unimplemented: soft delete)
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
+
+    @action(detail=True, methods=['delete'])
+    def delete(self, request, pk=None):
+        """Delete a post"""
+        post = get_object_or_404(Post, id=pk)
+        # Send a notification or save this action into all reports
+        # Save this action into all reports
+        '''
+        Report.objects.filter(post=post).update(
+        action='resolved',
+        handled_by=request.user,
+        )
+        '''
+        # Hard delete the post, which will trigger a cascade delete on related reports
+        post.delete()
+        return Response({"detail": "Post deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
