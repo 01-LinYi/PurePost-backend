@@ -10,11 +10,15 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "purepost.settings")
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
-from purepost.message_service.routing import websocket_urlpatterns
+from purepost.message_service.routing import websocket_urlpatterns as message_websocket_urlpatterns
+from purepost.notification_service.routing import websocket_urlpatterns as notification_websocket_urlpatterns
 
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": TokenAuthMiddleware(URLRouter(websocket_urlpatterns)),
+        "websocket": TokenAuthMiddleware(URLRouter([
+            *message_websocket_urlpatterns,
+            *notification_websocket_urlpatterns,
+        ])),
     }
 )
