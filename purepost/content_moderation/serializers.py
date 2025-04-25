@@ -126,16 +126,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
 
-         # Validation for scheduled posts
-        if data.get('status') == 'scheduled':
-            scheduled_for = data.get('scheduled_for')
-            if not scheduled_for:
-                raise serializers.ValidationError("Scheduled posts must have a scheduled_for date")
-                
-            # Check if scheduled date is in the future
-            if scheduled_for <= timezone.now():
-                raise serializers.ValidationError("Scheduled time must be in the future")
-
         # Validate tags (if provided)
         tags = data.get('tags')
         if tags:
@@ -168,9 +158,6 @@ class FolderSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'name',
                   'created_at', 'updated_at', 'post_count']
         read_only_fields = ['user', 'created_at', 'updated_at', 'post_count']
-
-    def get_post_count(self, obj):
-        return obj.saved_posts.count()
 
     def create(self, validated_data):
         request = self.context.get('request')
@@ -205,9 +192,10 @@ class SavedPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = SavedPost
         fields = ['id', 'user', 'post', 'post_id',
-                  'folder', 'folder_id', 'saved_at', 'created_at', 'updated_at']
+                  'folder', 'folder_id', 'created_at', 'updated_at', 'created_at', 'updated_at']
         read_only_fields = ['user', 'post',
-                            'folder', 'saved_at', 'created_at', 'updated_at']
+                           
+                            'folder', 'created_at', 'updated_at', 'created_at', 'updated_at']
 
     def validate_folder_id(self, value):
         if value and value.user != self.context['request'].user:
@@ -242,7 +230,7 @@ class SavedPostListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SavedPost
-        fields = ['id', 'post', 'folder_name', 'saved_at']
+        fields = ['id', 'post', 'folder_name', 'updated_at']
 
     def get_folder_name(self, obj):
         return obj.folder.name if obj.folder else "No Folder"
@@ -260,15 +248,10 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display',
-                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
+                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at',
+                  'post_author_username', 'action_taken']
         read_only_fields = ['status', 'created_at', 'updated_at', 'reporter']
 
-    def validate_post_id(self, value):
-        try:
-            Post.objects.get(id=value)
-        except Post.DoesNotExist:
-            raise serializers.ValidationError("Post does not exist")
-        return value
 
     def validate(self, data):
         request = self.context.get('request')
@@ -306,7 +289,10 @@ class ReportMiniSerializer(serializers.ModelSerializer):
     
     It includes only the necessary fields for displaying a list of reports.
     '''
-    post_id = serializers.IntegerField(source='post.id', read_only=True)
+    post_id = serializers.SerializerMethodField()
+
+    def get_post_id(self, obj):
+        return obj.post.id if obj.post else None
     reason_display = serializers.CharField(
         source='get_reason_display', read_only=True)
     status_display = serializers.CharField(

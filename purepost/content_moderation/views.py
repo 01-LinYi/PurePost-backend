@@ -341,57 +341,21 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(post)
         return Response(serializer.data)
     
-    @action(detail=True, methods=['post'], url_path='schedule')
-    def schedule_post(self, request, pk=None):
-        """Schedule a post for future publication"""
-        post = self.get_object()
-        
-        # Make sure the post belongs to the requesting user
-        if post.user != request.user:
-            return Response(
-                {"detail": "You don't have permission to schedule this post."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Get scheduled_for from request data
-        scheduled_for = request.data.get('scheduled_for')
-        if not scheduled_for:
-            return Response(
-                {"detail": "scheduled_for date is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            # Parse the datetime string
-            scheduled_datetime = parse_datetime(scheduled_for)
-            if not scheduled_datetime:
-                raise ValueError("Invalid datetime format")
-                
-            # Ensure timezone awareness
-            if not is_aware(scheduled_datetime):
-                scheduled_datetime = make_aware(scheduled_datetime)
-            
-            # Ensure the scheduled time is in the future
-            if scheduled_datetime <= timezone.now():
-                return Response(
-                    {"detail": "Scheduled time must be in the future"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Update the post
-            post.status = 'scheduled'
-            post.scheduled_for = scheduled_datetime
-            post.save()
-            
-            serializer = self.get_serializer(post)
-            return Response(serializer.data)
-            
-        except ValueError as e:
-            return Response(
-                {"detail": str(e) or "Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+    @action(detail=False, methods=['get'])
+    def admin_count(self, request):
+        count = Post.objects.filter(Q(visibility='public', status='published')).count()
+        return Response({"post_count": count})
+    
+    @action(detail=False, methods=['get'])
+    def admin_posts(self, request):
+        """Get all posts for admin view"""
+        queryset = Post.objects.all()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -401,7 +365,8 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return only folders owned by the current user"""
-        return Folder.objects.filter(user=self.request.user)
+        return Folder.objects.filter(user=self.request.user).annotate(
+            post_count=Count('saved_posts'))
 
     def perform_create(self, serializer):
         """Set current user as owner when creating a folder"""
@@ -409,13 +374,15 @@ class FolderViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def posts(self, request, pk=None):
-        """Get posts in a folder"""
         folder = self.get_object()
-        saved_posts = SavedPost.objects.filter(
-            folder=folder, user=request.user)
-        serializer = SavedPostListSerializer(
+        saved_posts = SavedPost.objects.filter(folder=folder)
+        folder_serializer = self.get_serializer(folder)
+        post_serializer = SavedPostListSerializer(
             saved_posts, many=True, context={'request': request})
-        return Response(serializer.data)
+        return Response({
+            "folder": folder_serializer.data,
+            "posts": post_serializer.data
+        })
 
 
 class SavedPostViewSet(viewsets.ModelViewSet):
@@ -445,6 +412,22 @@ class SavedPostViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set current user as owner when creating a saved post"""
         serializer.save(user=self.request.user)
+
+    @action(detail=False, methods=['delete'], url_path='by-post')
+    def delete_by_post(self, request):
+        """
+        delete a saved post by post_id.
+        """
+        post_id = request.query_params.get('post_id')
+        if not post_id:
+            return Response({'detail': 'post_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        # Only delete if the post is saved by the user
+        qs = SavedPost.objects.filter(user=request.user, post_id=post_id)
+        deleted, _ = qs.delete()
+        if deleted:
+            return Response({'detail': 'Unsave success'}, status=status.HTTP_204_NO_CONTENT)
+        else:
+            return Response({'detail': 'No saved post found'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=False, methods=['post'], url_path='toggle')
     def toggle_save(self, request):
