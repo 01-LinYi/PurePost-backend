@@ -1,7 +1,6 @@
 from rest_framework import serializers
 from .models import Post, Folder, SavedPost, Like, Share, Comment, Report
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 
 User = get_user_model()
 
@@ -81,7 +80,7 @@ class PostSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
             'status', 'caption', 'tags',
-            'comments', 'scheduled_for'
+            'comments'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
@@ -119,8 +118,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'content', 'image',
-                  'video', 'visibility', 'disclaimer','status',
-                  'caption', 'tags', 'scheduled_for']
+                  'video', 'visibility', 'disclaimer', 'status',
+                  'caption', 'tags']
 
     def validate(self, data):
         if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):

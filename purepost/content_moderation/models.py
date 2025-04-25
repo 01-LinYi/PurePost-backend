@@ -20,7 +20,6 @@ class Post(models.Model):
     STATUS_CHOICES = (
         ('draft', 'Draft'),
         ('published', 'Published'),
-        ('scheduled', 'Scheduled'), 
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
@@ -55,7 +54,6 @@ class Post(models.Model):
     caption = models.CharField(max_length=100, blank=True, null=True)
     # Add tags field - using JSONField to store array of strings
     tags = models.JSONField(default=list, blank=True, null=True)
-    scheduled_for = models.DateTimeField(blank=True, null=True)
 
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
@@ -80,10 +78,6 @@ class Post(models.Model):
             if not (self.content or self.image or self.video):
                 raise ValueError("Post must have at least content, image, or video")
 
-        # Ensure scheduled posts have a scheduled_for date
-        if self.status == 'scheduled' and not self.scheduled_for:
-            raise ValueError("Scheduled posts must have a scheduled_for date")
-            
         if self.tags is None:
             self.tags = []
 

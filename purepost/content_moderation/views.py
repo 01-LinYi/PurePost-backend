@@ -6,11 +6,6 @@ from rest_framework.serializers import ValidationError
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from django.utils.dateparse import parse_datetime
-from django.utils.timezone import is_aware, make_aware
-from django.utils import timezone
-
-
 
 from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
