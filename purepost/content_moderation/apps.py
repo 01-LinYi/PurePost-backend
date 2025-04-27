@@ -7,6 +7,8 @@ class ContentModerationConfig(AppConfig):
     name = 'purepost.content_moderation'
 
     def ready(self):
+        import purepost.content_moderation.signals  # noqa Import signals
+
         # Prevent scheduler from running twice or during migrations
         if 'runserver' in sys.argv:
             # Only import and start scheduler when the runserver command is used
