@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Post, Folder, SavedPost, Like, Share, Comment, Report
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -80,7 +81,7 @@ class PostSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
             'status', 'caption', 'tags',
-            'comments'
+            'comments', 'scheduled_for'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
@@ -119,13 +120,23 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = ['id', 'content', 'image',
                   'video', 'visibility', 'disclaimer', 'status',
-                  'caption', 'tags']
+                  'caption', 'tags', 'scheduled_for']
 
     def validate(self, data):
         if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
 
+         # Validation for scheduled posts
+        if data.get('status') == 'scheduled':
+             scheduled_for = data.get('scheduled_for')
+             if not scheduled_for:
+                 raise serializers.ValidationError("Scheduled posts must have a scheduled_for date")
+                 
+             # Check if scheduled date is in the future
+             if scheduled_for <= timezone.now():
+                 raise serializers.ValidationError("Scheduled time must be in the future")
+             
         # Validate tags (if provided)
         tags = data.get('tags')
         if tags:
