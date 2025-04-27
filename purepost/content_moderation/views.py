@@ -14,7 +14,7 @@ from .models import Post, Folder, SavedPost, Share, Comment, Report
 from .serializers import (
     UserSerializer, PostSerializer, PostCreateSerializer,
     FolderSerializer, SavedPostSerializer, SavedPostListSerializer,
-    CommentSerializer, ShareSerializer, 
+    CommentSerializer, ShareSerializer,
     ReportSerializer, ReportUpdateSerializer, ReportStatsSerializer, ReportMiniSerializer
 )
 from .permissions import IsOwnerOrReadOnly, IsReporterOrAdmin
@@ -230,11 +230,19 @@ class PostViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
+
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def share(self, request, pk=None):
         """Share a post"""
         post = self.get_object()
-        serializer = ShareSerializer(data=request.data)
+
+        # Check if already shared (assuming Share model exists, adjust as needed)
+        if post.shares.filter(user=request.user).exists():
+            # if already shared, just return success
+            return Response({"detail": "Post share count updated"}, status=status.HTTP_200_OK)
+
+        # if not created, create a new share record
+        serializer = ShareSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(user=request.user, post=post)
             post.share_count += 1
@@ -343,20 +351,19 @@ class PostViewSet(viewsets.ModelViewSet):
         # Return the updated post
         serializer = self.get_serializer(post)
         return Response(serializer.data)
-    
-   
+
     @action(detail=True, methods=['post'], url_path='schedule')
     def schedule_post(self, request, pk=None):
         """Schedule a post for future publication"""
         post = self.get_object()
-        
+
         # Make sure the post belongs to the requesting user
         if post.user != request.user:
             return Response(
                 {"detail": "You don't have permission to schedule this post."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         # Get scheduled_for from request data
         scheduled_for = request.data.get('scheduled_for')
         if not scheduled_for:
@@ -364,43 +371,45 @@ class PostViewSet(viewsets.ModelViewSet):
                 {"detail": "scheduled_for date is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
             # Parse the datetime string
             scheduled_datetime = parse_datetime(scheduled_for)
             if not scheduled_datetime:
                 raise ValueError("Invalid datetime format")
-                
+
             # Ensure timezone awareness
             if not is_aware(scheduled_datetime):
                 scheduled_datetime = make_aware(scheduled_datetime)
-            
+
             # Ensure the scheduled time is in the future
             if scheduled_datetime <= timezone.now():
                 return Response(
                     {"detail": "Scheduled time must be in the future"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
+
             # Update the post
             post.status = 'scheduled'
             post.scheduled_for = scheduled_datetime
             post.save()
-            
+
             serializer = self.get_serializer(post)
             return Response(serializer.data)
-            
+
         except ValueError as e:
             return Response(
-                {"detail": str(e) or "Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
+                {"detail": str(
+                    e) or "Invalid datetime format. Use ISO format (YYYY-MM-DDTHH:MM:SSZ)"},
                 status=status.HTTP_400_BAD_REQUEST
-            ) 
-    
+            )
+
     @action(detail=False, methods=['get'])
     def admin_count(self, request):
-        count = Post.objects.filter(Q(visibility='public', status='published')).count()
+        count = Post.objects.filter(
+            Q(visibility='public', status='published')).count()
         return Response({"post_count": count})
-    
+
     @action(detail=False, methods=['get'])
     def admin_posts(self, request):
         """Get all posts for admin view"""
@@ -547,7 +556,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
     def list_shares(self, request, pk=None):
         """Retrieve the list of users who shared a post."""
         post = get_object_or_404(Post, id=pk)
-        users = User.objects.filter(share__post=post).distinct()
+        users = User.objects.filter(shares__post=post).distinct()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
@@ -607,7 +616,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         elif self.action in ['stats', 'pending', 'resolve', 'reject', 'bulk_update']:
             return [IsAdminUser()]
         return [permissions.IsAuthenticated()]
-    
+
     def get_throttles(self):
         if self.action == 'create':
             # Apply throttling only for the create action
@@ -861,6 +870,7 @@ class ReportViewSet(viewsets.ModelViewSet):
         }
 
         return Response(data)
+
 
 class ModerationViewSet(viewsets.ViewSet):
     """
