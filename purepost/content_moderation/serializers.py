@@ -79,7 +79,9 @@ class PostSerializer(serializers.ModelSerializer):
             'id', 'user', 'content', 'image', 'video',
             'visibility', 'like_count', 'share_count', 'comment_count',
             'created_at', 'updated_at',
-            'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
+            'is_liked', 'is_saved', 'disclaimer', 
+            'deepfake_status', 'deepfake_score',
+            'pinned',
             'status', 'caption', 'tags',
             'comments', 'scheduled_for'
         ]
