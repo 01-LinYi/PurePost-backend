@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.db.models import Q
 
 
 class Post(models.Model):
@@ -20,6 +21,7 @@ class Post(models.Model):
     STATUS_CHOICES = (
         ('draft', 'Draft'),
         ('published', 'Published'),
+        ('scheduled', 'Scheduled'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
@@ -47,13 +49,12 @@ class Post(models.Model):
         blank=True,
         help_text="Confidence score for deepfake detection"
     )
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='published')
+    status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default='published')
     caption = models.CharField(max_length=100, blank=True, null=True)
     # Add tags field - using JSONField to store array of strings
     tags = models.JSONField(default=list, blank=True, null=True)
-    caption = models.CharField(max_length=100, blank=True, null=True)
-    # Add tags field - using JSONField to store array of strings
-    tags = models.JSONField(default=list, blank=True, null=True)
+    scheduled_for = models.DateTimeField(blank=True, null=True)
 
     # likes = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Like", related_name="liked_posts")
     # shares = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Share", related_name="shared_posts")
@@ -65,6 +66,10 @@ class Post(models.Model):
         verbose_name = 'Post'
         verbose_name_plural = 'Posts'
         ordering = ['-created_at']  # Default order by creation time descending
+        indexes = [
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['visibility', 'status']),
+        ]
 
     def __str__(self):
         """String representation"""
@@ -77,6 +82,10 @@ class Post(models.Model):
         if self.status != 'draft':
             if not (self.content or self.image or self.video):
                 raise ValueError("Post must have at least content, image, or video")
+            
+        # Ensure scheduled posts have a scheduled_for date
+        if self.status == 'scheduled' and not self.scheduled_for:
+             raise ValueError("Scheduled posts must have a scheduled_for date")
 
         if self.tags is None:
             self.tags = []
@@ -236,10 +245,16 @@ class Report(models.Model):
     )
 
     post = models.ForeignKey(
-        Post, on_delete=models.CASCADE, related_name='reports')
+        Post, on_delete=models.SET_NULL, related_name='reports', null=True, blank=True)
     reporter = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='submitted_reports')
     reason = models.CharField(max_length=20, choices=REPORT_REASONS)
+    post_author_username = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text="Username of the post author (back up)")
+    action_taken = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text="Action taken by the moderator/admin (e.g., 'Post removed')")
     additional_info = models.TextField(blank=True, null=True)
     status = models.CharField(
         max_length=10, choices=REPORT_STATUS, default='pending')
@@ -247,4 +262,17 @@ class Report(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('post', 'reporter')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['post', 'reporter'],
+                condition=Q(post__isnull=False),
+                name='unique_report_per_post_per_user'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['post', 'reporter']),
+            models.Index(fields=['status']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['reporter']),
+            models.Index(fields=['status', 'created_at']),
+        ]

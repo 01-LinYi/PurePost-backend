@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Post, Folder, SavedPost, Like, Share, Comment, Report
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -78,9 +79,11 @@ class PostSerializer(serializers.ModelSerializer):
             'id', 'user', 'content', 'image', 'video',
             'visibility', 'like_count', 'share_count', 'comment_count',
             'created_at', 'updated_at',
-            'is_liked', 'is_saved', 'disclaimer', 'deepfake_status', 'pinned',
+            'is_liked', 'is_saved', 'disclaimer', 
+            'deepfake_status', 'deepfake_score',
+            'pinned',
             'status', 'caption', 'tags',
-            'comments'
+            'comments', 'scheduled_for'
         ]
         read_only_fields = [
             'user', 'like_count', 'share_count', 'comment_count',
@@ -119,13 +122,23 @@ class PostCreateSerializer(serializers.ModelSerializer):
         model = Post
         fields = ['id', 'content', 'image',
                   'video', 'visibility', 'disclaimer', 'status',
-                  'caption', 'tags']
+                  'caption', 'tags', 'scheduled_for']
 
     def validate(self, data):
         if data.get('status') != 'draft' and not (data.get('content') or data.get('image') or data.get('video')):
             raise serializers.ValidationError(
                 "Post must have at least content, image, or video")
 
+         # Validation for scheduled posts
+        if data.get('status') == 'scheduled':
+             scheduled_for = data.get('scheduled_for')
+             if not scheduled_for:
+                 raise serializers.ValidationError("Scheduled posts must have a scheduled_for date")
+                 
+             # Check if scheduled date is in the future
+             if scheduled_for <= timezone.now():
+                 raise serializers.ValidationError("Scheduled time must be in the future")
+             
         # Validate tags (if provided)
         tags = data.get('tags')
         if tags:
@@ -192,9 +205,10 @@ class SavedPostSerializer(serializers.ModelSerializer):
     class Meta:
         model = SavedPost
         fields = ['id', 'user', 'post', 'post_id',
-                  'folder', 'folder_id', 'created_at', 'updated_at']
+                  'folder', 'folder_id', 'created_at', 'updated_at', 'created_at', 'updated_at']
         read_only_fields = ['user', 'post',
-                            'folder', 'created_at', 'updated_at']
+                           
+                            'folder', 'created_at', 'updated_at', 'created_at', 'updated_at']
 
     def validate_folder_id(self, value):
         if value and value.user != self.context['request'].user:
@@ -247,15 +261,10 @@ class ReportSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
         fields = ['id', 'post', 'post_id', 'reporter', 'reason', 'reason_display',
-                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at']
+                  'additional_info', 'status', 'status_display', 'created_at', 'updated_at',
+                  'post_author_username', 'action_taken']
         read_only_fields = ['status', 'created_at', 'updated_at', 'reporter']
 
-    def validate_post_id(self, value):
-        try:
-            Post.objects.get(id=value)
-        except Post.DoesNotExist:
-            raise serializers.ValidationError("Post does not exist")
-        return value
 
     def validate(self, data):
         request = self.context.get('request')
@@ -293,7 +302,10 @@ class ReportMiniSerializer(serializers.ModelSerializer):
     
     It includes only the necessary fields for displaying a list of reports.
     '''
-    post_id = serializers.IntegerField(source='post.id', read_only=True)
+    post_id = serializers.SerializerMethodField()
+
+    def get_post_id(self, obj):
+        return obj.post.id if obj.post else None
     reason_display = serializers.CharField(
         source='get_reason_display', read_only=True)
     status_display = serializers.CharField(

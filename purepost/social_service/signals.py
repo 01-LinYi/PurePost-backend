@@ -10,6 +10,6 @@ def follow_notification(sender, instance, created, **kwargs):
         send_notification(
             instance.following.user_profile,
             'follow',
-            f"{instance.follower.username} follow you",
+            f"{instance.follower.username} started following you",
             None
         )

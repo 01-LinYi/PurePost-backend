@@ -111,13 +111,6 @@ class ImageAnalysisViewSet(viewsets.ViewSet):
             # Check if post exists
             post = get_object_or_404(Post, id=post_id)
 
-            # Check if user has permission to analyze this post
-            if not request.user.is_staff and post.user != request.user:
-                return Response(
-                    {"detail": "You do not have permission to analyze this post"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
             # Check if an analysis already exists and is not failed
             existing_analysis = ImageAnalysis.objects.filter(
                 post_id=post_id).exclude(status='failed').first()

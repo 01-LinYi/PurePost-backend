@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'django_apscheduler',
 
     # Third-party apps
     "rest_framework",
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     "purepost.social_service",  # Social Service app
     "purepost.deepfake_detection",  # Deepfake Detection app
     "purepost.notification_service",  # Notification Service app
+    "purepost.feedback_service",  # Feedback Service app
 ]
 
 # Middleware
@@ -298,4 +300,15 @@ LOGGING = {
             "propagate": False,
         },
     },
+}
+
+# APScheduler settings
+SCHEDULER_CONFIG = {
+    "apscheduler.jobstores.default": {
+        "class": "django_apscheduler.jobstores:DjangoJobStore"
+    },
+    "apscheduler.executors.processpool": {
+        "type": "threadpool",
+        "max_workers": 5
+    }
 }

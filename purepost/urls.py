@@ -10,4 +10,5 @@ urlpatterns = [
     path('content/', include('purepost.content_moderation.urls')),
     path('deepfake/', include('purepost.deepfake_detection.urls')),
     path('notifications/', include('purepost.notification_service.urls')),
+    path('feedback/', include('purepost.feedback_service.urls')),
 ]
